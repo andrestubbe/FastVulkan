@@ -49,13 +49,25 @@ public class DemoImageZoom {
                 throw new RuntimeException("Failed to upload Vulkan texture!");
             }
 
-            // Create smooth continuous FastTween looping between 1.0x (full cover) and 2.2x zoom
-            Tween zoomTween = FastTween.to(1.0f, 2.2f, 3500)
-                    .ease(Ease.CUBIC_IN_OUT)
-                    .yoyo(true)
-                    .repeat(-1)
-                    .onUpdate(val -> currentZoom = val)
-                    .start();
+            // Create smooth continuous FastTween looping back and forth
+            final Tween[] zoomTweenHolder = new Tween[1];
+            final boolean[] forward = { true };
+
+            Runnable startNextTween = new Runnable() {
+                @Override
+                public void run() {
+                    float from = forward[0] ? 1.0f : 2.2f;
+                    float to = forward[0] ? 2.2f : 1.0f;
+                    forward[0] = !forward[0];
+
+                    zoomTweenHolder[0] = FastTween.to(from, to, 3500)
+                            .ease(Ease.CUBIC_IN_OUT)
+                            .onUpdate(val -> currentZoom = val)
+                            .onComplete(this)
+                            .start();
+                }
+            };
+            startNextTween.run();
 
             long lastFpsTime = System.currentTimeMillis();
             int frames = 0;
@@ -63,7 +75,9 @@ public class DemoImageZoom {
             while (window.pollEvents()) {
                 FastDWM.waitForVSync();
 
-                zoomTween.update();
+                if (zoomTweenHolder[0] != null) {
+                    zoomTweenHolder[0].update();
+                }
 
                 float winW = (float)window.getWidth();
                 float winH = (float)window.getHeight();
