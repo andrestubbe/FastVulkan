@@ -197,11 +197,12 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     RECT wr = { 0, 0, width, height };
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
 
+    // Create hidden first to apply DWM styling without white flash
     ctx->hwnd = CreateWindowExW(
         WS_EX_APPWINDOW,
         WINDOW_CLASS_NAME,
         title,
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         wr.right - wr.left, wr.bottom - wr.top,
         nullptr, nullptr, ctx->hInstance, nullptr
@@ -211,6 +212,16 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         delete ctx;
         return nullptr;
     }
+
+    // Apply native Windows Dark Mode and Dark Titlebar directly to HWND
+    BOOL darkMode = TRUE;
+    DwmSetWindowAttribute(ctx->hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &darkMode, sizeof(darkMode));
+    COLORREF captionColor = RGB(20, 20, 20);
+    DwmSetWindowAttribute(ctx->hwnd, 35 /* DWMWA_CAPTION_COLOR */, &captionColor, sizeof(captionColor));
+    COLORREF textColor = RGB(240, 240, 240);
+    DwmSetWindowAttribute(ctx->hwnd, 36 /* DWMWA_TEXT_COLOR */, &textColor, sizeof(textColor));
+    DWORD cornerStyle = 2; // Rounded
+    DwmSetWindowAttribute(ctx->hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &cornerStyle, sizeof(cornerStyle));
 
     SetWindowLongPtr(ctx->hwnd, GWLP_USERDATA, (LONG_PTR)ctx);
 
@@ -388,6 +399,11 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         vkCreateSemaphore(ctx->device, &semInfo, nullptr, &ctx->renderFinishedSemaphores[i]);
         vkCreateFence(ctx->device, &fenceInfo, nullptr, &ctx->inFlightFences[i]);
     }
+
+    // 9. Initial paint and make visible with dark theme applied
+    RenderAndPresent(ctx);
+    ShowWindow(ctx->hwnd, SW_SHOW);
+    UpdateWindow(ctx->hwnd);
 
     return ctx;
 }
