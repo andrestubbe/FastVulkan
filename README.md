@@ -63,6 +63,7 @@ public class Demo {
 
 Standard Java GUI toolkits suffer from thread synchronization overhead, laggy window resizing, and CPU rasterization bottlenecks. FastVulkan solves this with:
 
+- **FastGPU Core Foundation**: Leverages FastGPU for low-overhead Vulkan device initialization, off-heap memory management, and swapchain coordination.
 - **Native Win32 Message Loop**: Latency-free live window resize (`WM_SIZE` / `WM_SIZING`) without Java thread blocking.
 - **Instanced Quad Batching**: Thousands of shapes rendered in a single Vulkan command buffer dispatch.
 - **Zero-GC Architecture**: Off-heap vertex generation and direct native buffer exchanges.
@@ -72,11 +73,11 @@ Standard Java GUI toolkits suffer from thread synchronization overhead, laggy wi
 
 ## Key Features
 
-- 🌋 **Vulkan 1.3 2D Render Engine**: Ultra-low overhead SPIR-V shaders for real-time shapes and texture mapping.
+- 🌋 **Vulkan 1.3 2D Render Engine**: Built on top of **FastGPU** with ultra-low overhead SPIR-V shaders for real-time shapes and texture mapping.
 - 🪟 **Native Win32 Windowing**: Native `CreateWindowExW` loop with crisp DPI awareness and direct frame presents.
 - ⚡ **Instanced Batching**: Batch thousands of textured quads, rectangles, and rounded shapes in 1 draw call.
 - 🔍 **Smooth Zoom & Viewport Transform**: High-performance pan/zoom matrix math executed entirely on GPU.
-- 📦 **FastJava Ecosystem Ready**: Interoperates seamlessly with **FastGPU**, **FastImage**, and **FastCore**.
+- 📦 **FastJava Ecosystem Ready**: Interoperates seamlessly with **FastGPU**, **FastImage**, **FastUI**, and **FastCore**.
 
 ---
 
