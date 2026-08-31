@@ -104,9 +104,24 @@ Standard Java GUI toolkits suffer from thread synchronization overhead, laggy wi
 </repositories>
 
 <dependencies>
+    <!-- FastVulkan 2D Engine & Windowing -->
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastVulkan</artifactId>
+        <version>0.1.0</version>
+    </dependency>
+
+    <!-- FastGPU Native Acceleration Engine -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>fastgpu</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+
+    <!-- FastCore Unified JNI Loader -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastCore</artifactId>
         <version>0.1.0</version>
     </dependency>
 </dependencies>
