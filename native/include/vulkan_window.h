@@ -55,3 +55,4 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx);
 bool PollWindowEvents(VulkanWindowContext* ctx);
 void RenderAndPresent(VulkanWindowContext* ctx);
 void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a);
+void SetWindowTitle(VulkanWindowContext* ctx, const wchar_t* title);

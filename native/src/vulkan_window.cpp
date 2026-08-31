@@ -481,6 +481,11 @@ void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a)
     ctx->clearA = a;
 }
 
+void SetWindowTitle(VulkanWindowContext* ctx, const wchar_t* title) {
+    if (!ctx || !ctx->hwnd || !title) return;
+    SetWindowTextW(ctx->hwnd, title);
+}
+
 void RenderAndPresent(VulkanWindowContext* ctx) {
     if (!ctx || ctx->device == VK_NULL_HANDLE || ctx->swapChain == VK_NULL_HANDLE) return;
 

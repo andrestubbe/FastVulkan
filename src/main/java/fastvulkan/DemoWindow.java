@@ -32,7 +32,7 @@ public class DemoWindow {
                 frames++;
                 long now = System.currentTimeMillis();
                 if (now - lastFpsTime >= 1000) {
-                    System.out.println("⚡ Rendering at " + frames + " FPS | Zero Lag Resize Active");
+                    window.setTitle("FastVulkan — " + frames + " FPS | Zero-Lag Live Resize");
                     frames = 0;
                     lastFpsTime = now;
                 }

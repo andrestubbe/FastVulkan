@@ -34,6 +34,12 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    public void setTitle(String title) {
+        if (nativeHandle != 0) {
+            nSetTitle(nativeHandle, title);
+        }
+    }
+
     public void present() {
         if (nativeHandle != 0) {
             nRenderAndPresent(nativeHandle);
@@ -58,5 +64,6 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native boolean nPollEvents(long handle);
     private static native void nRenderAndPresent(long handle);
     private static native void nSetClearColor(long handle, float r, float g, float b, float a);
+    private static native void nSetTitle(long handle, String title);
     private static native long nGetHWND(long handle);
 }
