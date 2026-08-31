@@ -94,7 +94,7 @@ cl.exe /O2 /W3 /std:c++17 /MD /EHsc /LD ^
    /Fo:build\ ^
    /Fe:release\%LIB_NAME%.dll ^
    native\src\*.cpp ^
-   vulkan-1.lib user32.lib gdi32.lib shcore.lib dwmapi.lib ^
+   vulkan-1.lib user32.lib gdi32.lib shcore.lib dwmapi.lib uxtheme.lib ^
    /link /DLL /MACHINE:X64 %VK_LIB%
 
 if %ERRORLEVEL% == 0 (

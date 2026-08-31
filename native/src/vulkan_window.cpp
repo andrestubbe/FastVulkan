@@ -222,12 +222,13 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     DwmSetWindowAttribute(ctx->hwnd, 35 /* DWMWA_CAPTION_COLOR */, &captionColor, sizeof(captionColor));
     COLORREF textColor = RGB(240, 240, 240);
     DwmSetWindowAttribute(ctx->hwnd, 36 /* DWMWA_TEXT_COLOR */, &textColor, sizeof(textColor));
+    COLORREF borderColor = RGB(20, 20, 20);
+    DwmSetWindowAttribute(ctx->hwnd, 34 /* DWMWA_BORDER_COLOR */, &borderColor, sizeof(borderColor));
     DWORD cornerStyle = 2; // Rounded
     DwmSetWindowAttribute(ctx->hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &cornerStyle, sizeof(cornerStyle));
 
-    // Extend frame into client area to force DWM dark composition instantly
-    MARGINS margins = { -1, -1, -1, -1 };
-    DwmExtendFrameIntoClientArea(ctx->hwnd, &margins);
+    // Apply native DarkMode_Explorer theme to Win32 non-client chrome
+    SetWindowTheme(ctx->hwnd, L"DarkMode_Explorer", nullptr);
 
     SetWindowLongPtr(ctx->hwnd, GWLP_USERDATA, (LONG_PTR)ctx);
 

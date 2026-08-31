@@ -1,6 +1,7 @@
 #pragma once
 #include <windows.h>
 #include <dwmapi.h>
+#include <uxtheme.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
 #include <vector>
