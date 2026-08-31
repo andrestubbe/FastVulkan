@@ -37,7 +37,9 @@ echo Found Visual Studio at: %VS_PATH%
 
 :: Try to detect JAVA_HOME if not set
 if not defined JAVA_HOME (
-    if exist "C:\Program Files\Java\jdk-25" (
+    if exist "C:\Program Files\Java\jdk-21.0.12.1" (
+        set "JAVA_HOME=C:\Program Files\Java\jdk-21.0.12.1"
+    ) else if exist "C:\Program Files\Java\jdk-25" (
         set "JAVA_HOME=C:\Program Files\Java\jdk-25"
     ) else if exist "C:\Program Files\Eclipse Adoptium\jdk-17-hotspot" (
         set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17-hotspot"
@@ -92,8 +94,8 @@ cl.exe /O2 /W3 /std:c++17 /MD /EHsc /LD ^
    /Fo:build\ ^
    /Fe:release\%LIB_NAME%.dll ^
    native\src\*.cpp ^
-   %VK_LIB% vulkan-1.lib user32.lib gdi32.lib shcore.lib dwmapi.lib ^
-   /link /DLL /MACHINE:X64
+   vulkan-1.lib user32.lib gdi32.lib shcore.lib dwmapi.lib ^
+   /link /DLL /MACHINE:X64 %VK_LIB%
 
 if %ERRORLEVEL% == 0 (
     echo.

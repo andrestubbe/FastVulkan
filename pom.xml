@@ -17,7 +17,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <exec.mainClass>fastvulkan.Demo</exec.mainClass>
+        <exec.mainClass>fastvulkan.DemoWindow</exec.mainClass>
     </properties>
 
     <repositories>
@@ -33,6 +33,13 @@
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>FastCore</artifactId>
             <version>0.1.0</version>
+        </dependency>
+
+        <!-- FastTheme - Native DWM & Titlebar Styling -->
+        <dependency>
+            <groupId>com.github.andrestubbe</groupId>
+            <artifactId>FastTheme</artifactId>
+            <version>0.1.4</version>
         </dependency>
 
         <dependency>

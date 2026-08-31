@@ -1,0 +1,550 @@
+#include "vulkan_window.h"
+#include <algorithm>
+#include <stdexcept>
+#include <iostream>
+
+static const wchar_t* WINDOW_CLASS_NAME = L"FastVulkanWindowClass";
+
+static void CleanupSwapChain(VulkanWindowContext* ctx) {
+    if (!ctx || ctx->device == VK_NULL_HANDLE) return;
+
+    for (auto fb : ctx->swapChainFramebuffers) {
+        if (fb != VK_NULL_HANDLE) vkDestroyFramebuffer(ctx->device, fb, nullptr);
+    }
+    ctx->swapChainFramebuffers.clear();
+
+    for (auto iv : ctx->swapChainImageViews) {
+        if (iv != VK_NULL_HANDLE) vkDestroyImageView(ctx->device, iv, nullptr);
+    }
+    ctx->swapChainImageViews.clear();
+
+    if (ctx->swapChain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(ctx->device, ctx->swapChain, nullptr);
+        ctx->swapChain = VK_NULL_HANDLE;
+    }
+}
+
+static void CreateSwapChain(VulkanWindowContext* ctx) {
+    RECT rc;
+    GetClientRect(ctx->hwnd, &rc);
+    uint32_t winW = (std::max)(1, (int)(rc.right - rc.left));
+    uint32_t winH = (std::max)(1, (int)(rc.bottom - rc.top));
+
+    VkSurfaceCapabilitiesKHR capabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(ctx->physicalDevice, ctx->surface, &capabilities);
+
+    VkExtent2D extent;
+    if (capabilities.currentExtent.width != UINT32_MAX) {
+        extent = capabilities.currentExtent;
+    } else {
+        extent.width = (std::clamp)(winW, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        extent.height = (std::clamp)(winH, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+    }
+
+    uint32_t imageCount = capabilities.minImageCount + 1;
+    if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
+        imageCount = capabilities.maxImageCount;
+    }
+
+    VkSwapchainCreateInfoKHR createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = ctx->surface;
+    createInfo.minImageCount = imageCount;
+    createInfo.imageFormat = ctx->swapChainImageFormat;
+    createInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    createInfo.imageExtent = extent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createInfo.preTransform = capabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR; // Low latency, fallback to FIFO if needed
+
+    // Check supported present modes
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->physicalDevice, ctx->surface, &presentModeCount, nullptr);
+    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->physicalDevice, ctx->surface, &presentModeCount, presentModes.data());
+    
+    bool mailboxSupported = false;
+    for (const auto& mode : presentModes) {
+        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) mailboxSupported = true;
+    }
+    if (!mailboxSupported) {
+        createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    createInfo.clipped = VK_TRUE;
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+    if (vkCreateSwapchainKHR(ctx->device, &createInfo, nullptr, &ctx->swapChain) != VK_SUCCESS) {
+        return;
+    }
+
+    ctx->swapChainExtent = extent;
+
+    vkGetSwapchainImagesKHR(ctx->device, ctx->swapChain, &imageCount, nullptr);
+    ctx->swapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(ctx->device, ctx->swapChain, &imageCount, ctx->swapChainImages.data());
+
+    ctx->swapChainImageViews.resize(ctx->swapChainImages.size());
+    for (size_t i = 0; i < ctx->swapChainImages.size(); i++) {
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = ctx->swapChainImages[i];
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = ctx->swapChainImageFormat;
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        vkCreateImageView(ctx->device, &viewInfo, nullptr, &ctx->swapChainImageViews[i]);
+    }
+
+    ctx->swapChainFramebuffers.resize(ctx->swapChainImageViews.size());
+    for (size_t i = 0; i < ctx->swapChainImageViews.size(); i++) {
+        VkImageView attachments[] = { ctx->swapChainImageViews[i] };
+
+        VkFramebufferCreateInfo fbInfo{};
+        fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        fbInfo.renderPass = ctx->renderPass;
+        fbInfo.attachmentCount = 1;
+        fbInfo.pAttachments = attachments;
+        fbInfo.width = ctx->swapChainExtent.width;
+        fbInfo.height = ctx->swapChainExtent.height;
+        fbInfo.layers = 1;
+
+        vkCreateFramebuffer(ctx->device, &fbInfo, nullptr, &ctx->swapChainFramebuffers[i]);
+    }
+}
+
+static void RecreateSwapChain(VulkanWindowContext* ctx) {
+    RECT rc;
+    GetClientRect(ctx->hwnd, &rc);
+    int width = rc.right - rc.left;
+    int height = rc.bottom - rc.top;
+    if (width == 0 || height == 0) return;
+
+    vkDeviceWaitIdle(ctx->device);
+    CleanupSwapChain(ctx);
+    CreateSwapChain(ctx);
+    ctx->resized = false;
+}
+
+static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    VulkanWindowContext* ctx = (VulkanWindowContext*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+
+    switch (uMsg) {
+    case WM_ERASEBKGND:
+        return 1; // Prevent background erasing flicker
+
+    case WM_SIZE:
+        if (ctx) {
+            ctx->resized = true;
+            if (wParam != SIZE_MINIMIZED) {
+                // Immediate synchronous redraw during resize for 0-jitter
+                RecreateSwapChain(ctx);
+                RenderAndPresent(ctx);
+            }
+        }
+        return 0;
+
+    case WM_SIZING:
+        if (ctx) {
+            ctx->resized = true;
+            RecreateSwapChain(ctx);
+            RenderAndPresent(ctx);
+        }
+        return TRUE;
+
+    case WM_CLOSE:
+        if (ctx) ctx->shouldClose = true;
+        DestroyWindow(hwnd);
+        return 0;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
+    }
+
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int height) {
+    auto ctx = new VulkanWindowContext();
+    ctx->width = width;
+    ctx->height = height;
+    ctx->hInstance = GetModuleHandle(nullptr);
+
+    // Register Win32 class
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(WNDCLASSEXW);
+    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = ctx->hInstance;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wc.lpszClassName = WINDOW_CLASS_NAME;
+
+    RegisterClassExW(&wc);
+
+    // Calculate window rectangle
+    RECT wr = { 0, 0, width, height };
+    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+
+    ctx->hwnd = CreateWindowExW(
+        WS_EX_APPWINDOW,
+        WINDOW_CLASS_NAME,
+        title,
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        wr.right - wr.left, wr.bottom - wr.top,
+        nullptr, nullptr, ctx->hInstance, nullptr
+    );
+
+    if (!ctx->hwnd) {
+        delete ctx;
+        return nullptr;
+    }
+
+    SetWindowLongPtr(ctx->hwnd, GWLP_USERDATA, (LONG_PTR)ctx);
+
+    // 1. Create Vulkan Instance
+    VkApplicationInfo appInfo{};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "FastVulkan";
+    appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
+    appInfo.pEngineName = "FastVulkan Engine";
+    appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
+    appInfo.apiVersion = VK_API_VERSION_1_3;
+
+    std::vector<const char*> extensions = {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+    };
+
+    VkInstanceCreateInfo instInfo{};
+    instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instInfo.pApplicationInfo = &appInfo;
+    instInfo.enabledExtensionCount = (uint32_t)extensions.size();
+    instInfo.ppEnabledExtensionNames = extensions.data();
+
+    if (vkCreateInstance(&instInfo, nullptr, &ctx->instance) != VK_SUCCESS) {
+        // Fallback to 1.2
+        appInfo.apiVersion = VK_API_VERSION_1_2;
+        if (vkCreateInstance(&instInfo, nullptr, &ctx->instance) != VK_SUCCESS) {
+            DestroyWindow(ctx->hwnd);
+            delete ctx;
+            return nullptr;
+        }
+    }
+
+    // 2. Create Win32 Surface
+    VkWin32SurfaceCreateInfoKHR sci{};
+    sci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    sci.hwnd = ctx->hwnd;
+    sci.hinstance = ctx->hInstance;
+
+    if (vkCreateWin32SurfaceKHR(ctx->instance, &sci, nullptr, &ctx->surface) != VK_SUCCESS) {
+        DestroyVulkanWindow(ctx);
+        return nullptr;
+    }
+
+    // 3. Pick Physical Device & Find Graphics Queue
+    uint32_t deviceCount = 0;
+    vkEnumeratePhysicalDevices(ctx->instance, &deviceCount, nullptr);
+    std::vector<VkPhysicalDevice> devices(deviceCount);
+    vkEnumeratePhysicalDevices(ctx->instance, &deviceCount, devices.data());
+
+    for (const auto& dev : devices) {
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, nullptr);
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, queueFamilies.data());
+
+        for (uint32_t i = 0; i < queueFamilyCount; i++) {
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(dev, i, ctx->surface, &presentSupport);
+
+            if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && presentSupport) {
+                ctx->physicalDevice = dev;
+                ctx->queueFamilyIndex = i;
+                break;
+            }
+        }
+        if (ctx->physicalDevice != VK_NULL_HANDLE) break;
+    }
+
+    if (ctx->physicalDevice == VK_NULL_HANDLE) {
+        DestroyVulkanWindow(ctx);
+        return nullptr;
+    }
+
+    // 4. Create Logical Device
+    float queuePriority = 1.0f;
+    VkDeviceQueueCreateInfo queueCreateInfo{};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueFamilyIndex = ctx->queueFamilyIndex;
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = &queuePriority;
+
+    std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+    VkPhysicalDeviceFeatures deviceFeatures{};
+
+    VkDeviceCreateInfo devInfo{};
+    devInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    devInfo.queueCreateInfoCount = 1;
+    devInfo.pQueueCreateInfos = &queueCreateInfo;
+    devInfo.pEnabledFeatures = &deviceFeatures;
+    devInfo.enabledExtensionCount = (uint32_t)deviceExtensions.size();
+    devInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+    if (vkCreateDevice(ctx->physicalDevice, &devInfo, nullptr, &ctx->device) != VK_SUCCESS) {
+        DestroyVulkanWindow(ctx);
+        return nullptr;
+    }
+
+    vkGetDeviceQueue(ctx->device, ctx->queueFamilyIndex, 0, &ctx->graphicsQueue);
+
+    // 5. Create Render Pass
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format = ctx->swapChainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef{};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo rpInfo{};
+    rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    rpInfo.attachmentCount = 1;
+    rpInfo.pAttachments = &colorAttachment;
+    rpInfo.subpassCount = 1;
+    rpInfo.pSubpasses = &subpass;
+    rpInfo.dependencyCount = 1;
+    rpInfo.pDependencies = &dependency;
+
+    if (vkCreateRenderPass(ctx->device, &rpInfo, nullptr, &ctx->renderPass) != VK_SUCCESS) {
+        DestroyVulkanWindow(ctx);
+        return nullptr;
+    }
+
+    // 6. Create SwapChain
+    CreateSwapChain(ctx);
+
+    // 7. Create Command Pool & Buffers
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = ctx->queueFamilyIndex;
+
+    vkCreateCommandPool(ctx->device, &poolInfo, nullptr, &ctx->commandPool);
+
+    ctx->commandBuffers.resize(ctx->MAX_FRAMES_IN_FLIGHT);
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = ctx->commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = (uint32_t)ctx->commandBuffers.size();
+
+    vkAllocateCommandBuffers(ctx->device, &allocInfo, ctx->commandBuffers.data());
+
+    // 8. Create Sync Objects
+    ctx->imageAvailableSemaphores.resize(ctx->MAX_FRAMES_IN_FLIGHT);
+    ctx->renderFinishedSemaphores.resize(ctx->MAX_FRAMES_IN_FLIGHT);
+    ctx->inFlightFences.resize(ctx->MAX_FRAMES_IN_FLIGHT);
+
+    VkSemaphoreCreateInfo semInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+    VkFenceCreateInfo fenceInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (int i = 0; i < ctx->MAX_FRAMES_IN_FLIGHT; i++) {
+        vkCreateSemaphore(ctx->device, &semInfo, nullptr, &ctx->imageAvailableSemaphores[i]);
+        vkCreateSemaphore(ctx->device, &semInfo, nullptr, &ctx->renderFinishedSemaphores[i]);
+        vkCreateFence(ctx->device, &fenceInfo, nullptr, &ctx->inFlightFences[i]);
+    }
+
+    return ctx;
+}
+
+void DestroyVulkanWindow(VulkanWindowContext* ctx) {
+    if (!ctx) return;
+
+    if (ctx->device != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(ctx->device);
+
+        for (int i = 0; i < ctx->MAX_FRAMES_IN_FLIGHT; i++) {
+            if (ctx->imageAvailableSemaphores.size() > i && ctx->imageAvailableSemaphores[i] != VK_NULL_HANDLE)
+                vkDestroySemaphore(ctx->device, ctx->imageAvailableSemaphores[i], nullptr);
+            if (ctx->renderFinishedSemaphores.size() > i && ctx->renderFinishedSemaphores[i] != VK_NULL_HANDLE)
+                vkDestroySemaphore(ctx->device, ctx->renderFinishedSemaphores[i], nullptr);
+            if (ctx->inFlightFences.size() > i && ctx->inFlightFences[i] != VK_NULL_HANDLE)
+                vkDestroyFence(ctx->device, ctx->inFlightFences[i], nullptr);
+        }
+
+        if (ctx->commandPool != VK_NULL_HANDLE) {
+            vkDestroyCommandPool(ctx->device, ctx->commandPool, nullptr);
+        }
+
+        CleanupSwapChain(ctx);
+
+        if (ctx->renderPass != VK_NULL_HANDLE) {
+            vkDestroyRenderPass(ctx->device, ctx->renderPass, nullptr);
+        }
+
+        vkDestroyDevice(ctx->device, nullptr);
+    }
+
+    if (ctx->surface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(ctx->instance, ctx->surface, nullptr);
+    }
+
+    if (ctx->instance != VK_NULL_HANDLE) {
+        vkDestroyInstance(ctx->instance, nullptr);
+    }
+
+    if (ctx->hwnd) {
+        DestroyWindow(ctx->hwnd);
+    }
+
+    delete ctx;
+}
+
+bool PollWindowEvents(VulkanWindowContext* ctx) {
+    if (!ctx || ctx->shouldClose) return false;
+
+    MSG msg;
+    while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        if (msg.message == WM_QUIT) {
+            ctx->shouldClose = true;
+            return false;
+        }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    return !ctx->shouldClose;
+}
+
+void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a) {
+    if (!ctx) return;
+    ctx->clearR = r;
+    ctx->clearG = g;
+    ctx->clearB = b;
+    ctx->clearA = a;
+}
+
+void RenderAndPresent(VulkanWindowContext* ctx) {
+    if (!ctx || ctx->device == VK_NULL_HANDLE || ctx->swapChain == VK_NULL_HANDLE) return;
+
+    vkWaitForFences(ctx->device, 1, &ctx->inFlightFences[ctx->currentFrame], VK_TRUE, UINT64_MAX);
+
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+        ctx->device,
+        ctx->swapChain,
+        UINT64_MAX,
+        ctx->imageAvailableSemaphores[ctx->currentFrame],
+        VK_NULL_HANDLE,
+        &imageIndex
+    );
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        RecreateSwapChain(ctx);
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        return;
+    }
+
+    vkResetFences(ctx->device, 1, &ctx->inFlightFences[ctx->currentFrame]);
+
+    VkCommandBuffer cmd = ctx->commandBuffers[ctx->currentFrame];
+    vkResetCommandBuffer(cmd, 0);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = ctx->renderPass;
+    renderPassInfo.framebuffer = ctx->swapChainFramebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = { 0, 0 };
+    renderPassInfo.renderArea.extent = ctx->swapChainExtent;
+
+    VkClearValue clearColor = { {{ctx->clearR, ctx->clearG, ctx->clearB, ctx->clearA}} };
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+
+    vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // End render pass
+    vkCmdEndRenderPass(cmd);
+
+    vkEndCommandBuffer(cmd);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = { ctx->imageAvailableSemaphores[ctx->currentFrame] };
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmd;
+
+    VkSemaphore signalSemaphores[] = { ctx->renderFinishedSemaphores[ctx->currentFrame] };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(ctx->graphicsQueue, 1, &submitInfo, ctx->inFlightFences[ctx->currentFrame]) != VK_SUCCESS) {
+        return;
+    }
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = { ctx->swapChain };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    result = vkQueuePresentKHR(ctx->graphicsQueue, &presentInfo);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || ctx->resized) {
+        ctx->resized = false;
+        RecreateSwapChain(ctx);
+    }
+
+    ctx->currentFrame = (ctx->currentFrame + 1) % ctx->MAX_FRAMES_IN_FLIGHT;
+}
