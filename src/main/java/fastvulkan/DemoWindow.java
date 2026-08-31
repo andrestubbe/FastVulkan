@@ -29,19 +29,18 @@ public class DemoWindow {
             int frames = 0;
 
             while (window.pollEvents()) {
+                // Lock render pacing directly to physical monitor VSync with zero GC
+                FastDWM.waitForVSync();
+
                 window.present();
 
                 frames++;
                 long now = System.currentTimeMillis();
                 if (now - lastFpsTime >= 1000) {
-                    window.setTitle("FastVulkan — " + frames + " FPS | Zero-Lag Live Resize");
+                    window.setTitle("FastVulkan — " + frames + " FPS | Hardware VSync Active");
                     frames = 0;
                     lastFpsTime = now;
                 }
-
-                try {
-                    Thread.sleep(1);
-                } catch (InterruptedException ignored) {}
             }
         }
 

@@ -127,6 +127,27 @@ Add the JitPack repository and the dependency stack to your `pom.xml`:
         <version>0.1.1</version>
     </dependency>
 
+    <!-- FastDWM Native VSync & Precision Timing -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastDWM</artifactId>
+        <version>0.1.0</version>
+    </dependency>
+
+    <!-- FastExecution Precision Scheduling Engine -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastExecution</artifactId>
+        <version>0.1.0</version>
+    </dependency>
+
+    <!-- FastTheme Native Styling & Dynamic Theming -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastTheme</artifactId>
+        <version>0.1.4</version>
+    </dependency>
+
     <!-- FastCore Unified JNI Loader -->
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
@@ -146,6 +167,9 @@ repositories {
 dependencies {
     implementation 'com.github.andrestubbe:FastVulkan:0.1.0'
     implementation 'com.github.andrestubbe:fastgpu:0.1.1'
+    implementation 'com.github.andrestubbe:FastDWM:0.1.0'
+    implementation 'com.github.andrestubbe:FastExecution:0.1.0'
+    implementation 'com.github.andrestubbe:FastTheme:0.1.4'
     implementation 'com.github.andrestubbe:FastCore:0.1.0'
 }
 ```
@@ -156,7 +180,10 @@ Download the required JARs directly to add them to your classpath:
 
 1. 📦 **[FastVulkan-0.1.0.jar](https://github.com/andrestubbe/FastVulkan/releases/download/0.1.0/FastVulkan-0.1.0.jar)** (The Core Library)
 2. ⚡ **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/0.1.1/fastgpu-0.1.1.jar)** (GPU Compute & Memory Foundation)
-3. ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native Loader)
+3. ⏱️ **[fastdwm-0.1.0.jar](https://github.com/andrestubbe/FastDWM/releases/download/0.1.0/fastdwm-0.1.0.jar)** (Hardware VSync & Timing)
+4. ⚙️ **[fastexecution-0.1.0.jar](https://github.com/andrestubbe/FastExecution/releases/download/0.1.0/fastexecution-0.1.0.jar)** (Precision Scheduling)
+5. 🎨 **[FastTheme-0.1.4.jar](https://github.com/andrestubbe/FastTheme/releases/download/0.1.4/FastTheme-0.1.4.jar)** (Native Window Styling)
+6. 🚀 **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native Loader)
 
 > [!IMPORTANT]
 > All JARs must be included in your classpath for the native Vulkan JNI bindings to function correctly.
