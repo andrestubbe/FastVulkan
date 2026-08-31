@@ -93,7 +93,9 @@ Standard Java GUI toolkits suffer from thread synchronization overhead, laggy wi
 
 ## Installation
 
-### Maven (via JitPack)
+### Option 1: Maven (Recommended)
+
+Add the JitPack repository and the dependency stack to your `pom.xml`:
 
 ```xml
 <repositories>
@@ -126,6 +128,31 @@ Standard Java GUI toolkits suffer from thread synchronization overhead, laggy wi
     </dependency>
 </dependencies>
 ```
+
+### Option 2: Gradle (via JitPack)
+
+```groovy
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'com.github.andrestubbe:FastVulkan:0.1.0'
+    implementation 'com.github.andrestubbe:fastgpu:0.1.1'
+    implementation 'com.github.andrestubbe:FastCore:0.1.0'
+}
+```
+
+### Option 3: Direct Download (No Build Tool)
+
+Download the required JARs directly to add them to your classpath:
+
+1. 📦 **[FastVulkan-0.1.0.jar](https://github.com/andrestubbe/FastVulkan/releases/download/0.1.0/FastVulkan-0.1.0.jar)** (The Core Library)
+2. ⚡ **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/0.1.1/fastgpu-0.1.1.jar)** (GPU Compute & Memory Foundation)
+3. ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native Loader)
+
+> [!IMPORTANT]
+> All JARs must be included in your classpath for the native Vulkan JNI bindings to function correctly.
 
 ---
 
