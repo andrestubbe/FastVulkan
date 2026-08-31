@@ -4,9 +4,11 @@ import fasttheme.FastTheme;
 
 public class DemoWindow {
     public static void main(String[] args) {
-        System.out.println("==================================================");
-        System.out.println("🌋 FastVulkan Window & Live-Resize Demo");
-        System.out.println("==================================================");
+        // Automatically hide the terminal console window if started from .bat
+        long consoleHwnd = FastTheme.getConsoleWindowHandle();
+        if (consoleHwnd != 0) {
+            FastTheme.setWindowTransparency(consoleHwnd, 0);
+        }
 
         try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan - Zero-Jitter Live Resize", 1024, 600)) {
             
