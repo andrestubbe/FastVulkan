@@ -1,5 +1,6 @@
 package fastvulkan;
 
+import fastdwm.FastDWM;
 import fasttheme.FastTheme;
 
 public class DemoWindow {
