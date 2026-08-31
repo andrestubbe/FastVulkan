@@ -51,7 +51,7 @@ struct VulkanWindowContext {
     float clearA = 1.0f;
 };
 
-VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int height);
+VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int height, float clearR = 0.88f, float clearG = 0.12f, float clearB = 0.12f, float clearA = 1.0f);
 void DestroyVulkanWindow(VulkanWindowContext* ctx);
 bool PollWindowEvents(VulkanWindowContext* ctx);
 void RenderAndPresent(VulkanWindowContext* ctx);

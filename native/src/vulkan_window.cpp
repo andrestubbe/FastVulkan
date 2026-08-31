@@ -175,10 +175,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int height) {
+VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int height, float clearR, float clearG, float clearB, float clearA) {
     auto ctx = new VulkanWindowContext();
     ctx->width = width;
     ctx->height = height;
+    ctx->clearR = clearR;
+    ctx->clearG = clearG;
+    ctx->clearB = clearB;
+    ctx->clearA = clearA;
     ctx->hInstance = GetModuleHandle(nullptr);
 
     // Register standard Win32 window class

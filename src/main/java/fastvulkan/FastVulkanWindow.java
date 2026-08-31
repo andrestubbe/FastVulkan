@@ -12,7 +12,11 @@ public class FastVulkanWindow implements AutoCloseable {
     private final long hwnd;
 
     public FastVulkanWindow(String title, int width, int height) {
-        this.nativeHandle = nCreateWindow(title, width, height);
+        this(title, width, height, 0.88f, 0.12f, 0.12f, 1.0f);
+    }
+
+    public FastVulkanWindow(String title, int width, int height, float clearR, float clearG, float clearB, float clearA) {
+        this.nativeHandle = nCreateWindow(title, width, height, clearR, clearG, clearB, clearA);
         if (this.nativeHandle == 0) {
             throw new RuntimeException("Failed to create native Vulkan window");
         }
@@ -59,7 +63,7 @@ public class FastVulkanWindow implements AutoCloseable {
     }
 
     // JNI Native methods
-    private static native long nCreateWindow(String title, int width, int height);
+    private static native long nCreateWindow(String title, int width, int height, float r, float g, float b, float a);
     private static native void nDestroyWindow(long handle);
     private static native boolean nPollEvents(long handle);
     private static native void nRenderAndPresent(long handle);
