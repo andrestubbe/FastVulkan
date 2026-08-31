@@ -181,15 +181,14 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     ctx->height = height;
     ctx->hInstance = GetModuleHandle(nullptr);
 
-    // Register Win32 class with Dark Gray/Black Background Brush
-    static HBRUSH hDarkBrush = CreateSolidBrush(RGB(20, 20, 20));
+    // Register standard Win32 window class
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wc.lpfnWndProc = WndProc;
     wc.hInstance = ctx->hInstance;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = hDarkBrush;
+    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     wc.lpszClassName = WINDOW_CLASS_NAME;
 
     RegisterClassExW(&wc);
@@ -198,7 +197,6 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     RECT wr = { 0, 0, width, height };
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
 
-    // Create hidden first to apply DWM styling without white flash
     ctx->hwnd = CreateWindowExW(
         WS_EX_APPWINDOW,
         WINDOW_CLASS_NAME,
@@ -214,21 +212,15 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         return nullptr;
     }
 
-    // Enforce dark mode and dark titlebar before any display
+    // Standard Windows Dark Mode titlebar
     BOOL darkMode = TRUE;
     DwmSetWindowAttribute(ctx->hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &darkMode, sizeof(darkMode));
-    DwmSetWindowAttribute(ctx->hwnd, 19 /* DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 */, &darkMode, sizeof(darkMode));
     COLORREF captionColor = RGB(20, 20, 20);
     DwmSetWindowAttribute(ctx->hwnd, 35 /* DWMWA_CAPTION_COLOR */, &captionColor, sizeof(captionColor));
     COLORREF textColor = RGB(240, 240, 240);
     DwmSetWindowAttribute(ctx->hwnd, 36 /* DWMWA_TEXT_COLOR */, &textColor, sizeof(textColor));
-    COLORREF borderColor = RGB(20, 20, 20);
-    DwmSetWindowAttribute(ctx->hwnd, 34 /* DWMWA_BORDER_COLOR */, &borderColor, sizeof(borderColor));
     DWORD cornerStyle = 2; // Rounded
     DwmSetWindowAttribute(ctx->hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &cornerStyle, sizeof(cornerStyle));
-
-    // Apply native DarkMode_Explorer theme to Win32 non-client chrome
-    SetWindowTheme(ctx->hwnd, L"DarkMode_Explorer", nullptr);
 
     SetWindowLongPtr(ctx->hwnd, GWLP_USERDATA, (LONG_PTR)ctx);
 
