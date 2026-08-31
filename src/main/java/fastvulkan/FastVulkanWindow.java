@@ -83,6 +83,16 @@ public class FastVulkanWindow implements AutoCloseable {
         return hwnd;
     }
 
+    public int getWidth() {
+        if (nativeHandle == 0) return 0;
+        return nGetWidth(nativeHandle);
+    }
+
+    public int getHeight() {
+        if (nativeHandle == 0) return 0;
+        return nGetHeight(nativeHandle);
+    }
+
     @Override
     public void close() {
         if (nativeHandle != 0) {
@@ -99,6 +109,8 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nSetClearColor(long handle, float r, float g, float b, float a);
     private static native void nSetTitle(long handle, String title);
     private static native long nGetHWND(long handle);
+    private static native int nGetWidth(long handle);
+    private static native int nGetHeight(long handle);
     private static native long nCreateTexture(long handle, int[] pixels, int width, int height, boolean mipmaps);
     private static native void nDestroyTexture(long handle, long texHandle);
     private static native void nDrawImage(long handle, long texHandle, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);

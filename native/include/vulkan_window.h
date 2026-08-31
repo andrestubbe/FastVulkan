@@ -74,6 +74,8 @@ bool PollWindowEvents(VulkanWindowContext* ctx);
 void RenderAndPresent(VulkanWindowContext* ctx);
 void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a);
 void SetWindowTitle(VulkanWindowContext* ctx, const wchar_t* title);
+int GetWindowWidth(VulkanWindowContext* ctx);
+int GetWindowHeight(VulkanWindowContext* ctx);
 
 VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, uint32_t width, uint32_t height, bool generateMipmaps = true);
 void DestroyTexture(VulkanWindowContext* ctx, VulkanTexture* tex);

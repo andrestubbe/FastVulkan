@@ -35,6 +35,20 @@
             <version>0.1.0</version>
         </dependency>
 
+        <!-- FastTween - High-Performance Easing & Interpolation -->
+        <dependency>
+            <groupId>com.github.andrestubbe</groupId>
+            <artifactId>FastTween</artifactId>
+            <version>0.1.1</version>
+        </dependency>
+
+        <!-- FastAnimation - Timeline Orchestration & Native VSync Engine -->
+        <dependency>
+            <groupId>com.github.andrestubbe</groupId>
+            <artifactId>FastAnimation</artifactId>
+            <version>0.1.2</version>
+        </dependency>
+
         <!-- FastTheme - Native DWM & Titlebar Styling -->
         <dependency>
             <groupId>com.github.andrestubbe</groupId>

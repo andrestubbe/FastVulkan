@@ -61,6 +61,18 @@ JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nGetHWND(
     return (jlong)((VulkanWindowContext*)handle)->hwnd;
 }
 
+JNIEXPORT jint JNICALL Java_fastvulkan_FastVulkanWindow_nGetWidth(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (!handle) return 0;
+    return (jint)GetWindowWidth((VulkanWindowContext*)handle);
+}
+
+JNIEXPORT jint JNICALL Java_fastvulkan_FastVulkanWindow_nGetHeight(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (!handle) return 0;
+    return (jint)GetWindowHeight((VulkanWindowContext*)handle);
+}
+
 JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateTexture(
     JNIEnv* env, jclass clazz, jlong handle, jintArray pixels, jint width, jint height, jboolean mipmaps) {
     if (!handle || !pixels || width <= 0 || height <= 0) return 0;

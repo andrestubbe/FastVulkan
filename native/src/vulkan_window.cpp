@@ -484,6 +484,16 @@ void SetWindowTitle(VulkanWindowContext* ctx, const wchar_t* title) {
     SetWindowTextW(ctx->hwnd, title);
 }
 
+int GetWindowWidth(VulkanWindowContext* ctx) {
+    if (!ctx) return 0;
+    return (int)ctx->swapChainExtent.width;
+}
+
+int GetWindowHeight(VulkanWindowContext* ctx) {
+    if (!ctx) return 0;
+    return (int)ctx->swapChainExtent.height;
+}
+
 void RenderAndPresent(VulkanWindowContext* ctx) {
     if (!ctx || ctx->device == VK_NULL_HANDLE || ctx->swapChain == VK_NULL_HANDLE) return;
 

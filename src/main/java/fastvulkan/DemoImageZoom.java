@@ -2,6 +2,9 @@ package fastvulkan;
 
 import fastdwm.FastDWM;
 import fasttheme.FastTheme;
+import fasttween.Ease;
+import fasttween.FastTween;
+import fasttween.Tween;
 
 import java.awt.Dimension;
 import java.awt.Rectangle;
@@ -11,6 +14,8 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 
 public class DemoImageZoom {
+    private static float currentZoom = 1.0f;
+
     public static void main(String[] args) throws Exception {
         // Auto-hide console if started from batch
         long consoleHwnd = FastTheme.getConsoleWindowHandle();
@@ -28,9 +33,7 @@ public class DemoImageZoom {
         int imgH = screenshot.getHeight();
         int[] pixels = ((DataBufferInt) screenshot.getRaster().getDataBuffer()).getData();
 
-        System.out.println("Screenshot captured: " + imgW + "x" + imgH);
-
-        // Open Vulkan Window (Dark Background)
+        // Open Vulkan Window
         try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan — Image Zoom & Antialiasing", 1280, 720, 0.08f, 0.08f, 0.08f, 1.0f)) {
             long hwnd = window.getHWND();
             if (hwnd != 0) {
@@ -40,35 +43,41 @@ public class DemoImageZoom {
                 FastTheme.setCornerStyle(hwnd, 2);
             }
 
-            // Upload Screenshot to Vulkan Texture with Automatic Mipmap Generation
+            // Upload Screenshot to Vulkan Texture with Mipmap Generation
             long texture = window.createTexture(pixels, imgW, imgH, true);
             if (texture == 0) {
                 throw new RuntimeException("Failed to upload Vulkan texture!");
             }
 
-            float zoom = 1.0f;
-            float zoomSpeed = 0.005f;
-            boolean zoomingIn = true;
+            // Create smooth continuous FastTween looping between 1.0x (full cover) and 2.2x zoom
+            Tween zoomTween = FastTween.to(1.0f, 2.2f, 3500)
+                    .ease(Ease.SINE_IN_OUT)
+                    .yoyo(true)
+                    .repeat(-1)
+                    .onUpdate(val -> currentZoom = val)
+                    .start();
+
             long lastFpsTime = System.currentTimeMillis();
             int frames = 0;
 
             while (window.pollEvents()) {
                 FastDWM.waitForVSync();
 
-                // Dynamic Smooth Zoom & Center Pan Animation
-                if (zoomingIn) {
-                    zoom += zoomSpeed;
-                    if (zoom >= 2.5f) zoomingIn = false;
-                } else {
-                    zoom -= zoomSpeed;
-                    if (zoom <= 0.4f) zoomingIn = true;
-                }
+                zoomTween.update();
 
-                float winW = 1280.0f;
-                float winH = 720.0f;
+                float winW = (float)window.getWidth();
+                float winH = (float)window.getHeight();
+                if (winW <= 0) winW = 1280.0f;
+                if (winH <= 0) winH = 720.0f;
 
-                float renderW = (winW * 0.8f) * zoom;
-                float renderH = (winH * 0.8f) * zoom;
+                // Compute aspect-ratio fill scale so image ALWAYS completely covers the entire window without borders
+                float scaleX = winW / (float)imgW;
+                float scaleY = winH / (float)imgH;
+                float baseScale = Math.max(scaleX, scaleY);
+
+                float finalScale = baseScale * currentZoom;
+                float renderW = (float)imgW * finalScale;
+                float renderH = (float)imgH * finalScale;
                 float posX = (winW - renderW) * 0.5f;
                 float posY = (winH - renderH) * 0.5f;
 
