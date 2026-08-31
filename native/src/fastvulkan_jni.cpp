@@ -7,10 +7,14 @@ JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateWindow(
     JNIEnv* env, jclass clazz, jstring title, jint width, jint height, jfloat r, jfloat g, jfloat b, jfloat a) {
     
     if (!title) return 0;
-    const jchar* rawChars = env->GetStringChars(title, nullptr);
+    const jchar* chars = env->GetStringChars(title, nullptr);
     jsize len = env->GetStringLength(title);
-    std::wstring wTitle((const wchar_t*)rawChars, len);
-    env->ReleaseStringChars(title, rawChars);
+    std::wstring wTitle;
+    wTitle.resize(len);
+    for (jsize i = 0; i < len; i++) {
+        wTitle[i] = (wchar_t)chars[i];
+    }
+    env->ReleaseStringChars(title, chars);
 
     VulkanWindowContext* ctx = CreateVulkanWindow(wTitle.c_str(), width, height, r, g, b, a);
     return (jlong)ctx;
@@ -46,12 +50,16 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetClearColor(
 JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetTitle(
     JNIEnv* env, jclass clazz, jlong handle, jstring title) {
     if (handle && title) {
-        const jchar* rawChars = env->GetStringChars(title, nullptr);
+        const jchar* chars = env->GetStringChars(title, nullptr);
         jsize len = env->GetStringLength(title);
-        std::wstring wTitle((const wchar_t*)rawChars, len);
-        env->ReleaseStringChars(title, rawChars);
+        std::wstring wstr;
+        wstr.resize(len);
+        for (jsize i = 0; i < len; i++) {
+            wstr[i] = (wchar_t)chars[i];
+        }
+        env->ReleaseStringChars(title, chars);
 
-        SetWindowTitle((VulkanWindowContext*)handle, wTitle.c_str());
+        SetWindowTitle((VulkanWindowContext*)handle, wstr.c_str());
     }
 }
 
