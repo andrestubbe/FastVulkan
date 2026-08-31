@@ -181,7 +181,7 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     ctx->height = height;
     ctx->hInstance = GetModuleHandle(nullptr);
 
-    // Register Win32 class
+    // Register Win32 class with NO default background erase (prevents white frame)
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
@@ -213,9 +213,10 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         return nullptr;
     }
 
-    // Apply native Windows Dark Mode and Dark Titlebar directly to HWND
+    // Enforce dark mode and dark titlebar before any display
     BOOL darkMode = TRUE;
     DwmSetWindowAttribute(ctx->hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &darkMode, sizeof(darkMode));
+    DwmSetWindowAttribute(ctx->hwnd, 19 /* DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 */, &darkMode, sizeof(darkMode));
     COLORREF captionColor = RGB(20, 20, 20);
     DwmSetWindowAttribute(ctx->hwnd, 35 /* DWMWA_CAPTION_COLOR */, &captionColor, sizeof(captionColor));
     COLORREF textColor = RGB(240, 240, 240);

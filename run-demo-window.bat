@@ -17,5 +17,5 @@ if not exist release\fastvulkan.dll (
     exit /b 1
 )
 
-:: Compile and run Java demo
-mvn clean compile exec:java -Dexec.mainClass="fastvulkan.DemoWindow"
+:: Compile and run Java demo quietly
+mvn -q compile exec:java -Dexec.mainClass="fastvulkan.DemoWindow"
