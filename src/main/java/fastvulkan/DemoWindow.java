@@ -16,6 +16,7 @@ public class DemoWindow {
                 FastTheme.setTitleBarDarkMode(hwnd, true);
                 FastTheme.setTitleBarColor(hwnd, 20, 20, 20);
                 FastTheme.setTitleBarTextColor(hwnd, 240, 240, 240);
+                FastTheme.setWindowBackgroundColor(hwnd, 20, 20, 20);
                 FastTheme.setCornerStyle(hwnd, 2); // Windows 11 Rounded corners
             }
 

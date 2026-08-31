@@ -148,7 +148,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         if (ctx) {
             ctx->resized = true;
             if (wParam != SIZE_MINIMIZED) {
-                // Immediate synchronous redraw during resize for 0-jitter
                 RecreateSwapChain(ctx);
                 RenderAndPresent(ctx);
             }
@@ -161,7 +160,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             RecreateSwapChain(ctx);
             RenderAndPresent(ctx);
         }
-        return TRUE;
+        return 0;
 
     case WM_CLOSE:
         if (ctx) ctx->shouldClose = true;
