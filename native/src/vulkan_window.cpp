@@ -225,6 +225,10 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     DWORD cornerStyle = 2; // Rounded
     DwmSetWindowAttribute(ctx->hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &cornerStyle, sizeof(cornerStyle));
 
+    // Extend frame into client area to force DWM dark composition instantly
+    MARGINS margins = { -1, -1, -1, -1 };
+    DwmExtendFrameIntoClientArea(ctx->hwnd, &margins);
+
     SetWindowLongPtr(ctx->hwnd, GWLP_USERDATA, (LONG_PTR)ctx);
 
     // 1. Create Vulkan Instance
