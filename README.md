@@ -8,7 +8,7 @@
 
 ---
 
-**🌋 Ultra-fast native Vulkan 2D batch rendering and Win32 zero-latency window engine for Java.** Built for maximum framerates, zero JVM Garbage Collection overhead, and seamless live window resizing.
+**🌋 Ultra-fast native Vulkan 2D batch rendering and Win32 zero-latency window engine for Java, designed to power FastUI.** Built for maximum framerates, zero JVM Garbage Collection overhead, and seamless live window resizing.
 
 FastVulkan provides a low-overhead GPU-accelerated 2D pipeline (instanced shapes, quad batching, texture rendering, and smooth zoom/transforms) with native C++ window management.
 
