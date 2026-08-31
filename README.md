@@ -19,18 +19,26 @@ FastVulkan provides a low-overhead GPU-accelerated 2D pipeline (instanced shapes
 ```java
 import fastvulkan.FastVulkanWindow;
 import fastvulkan.FastVulkanGraphics;
+import fastdwm.FastDWM;
 
 public class Demo {
     public static void main(String[] args) {
-        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan Demo", 1280, 720)) {
+        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan Demo", 1280, 720, 0.08f, 0.08f, 0.08f, 1.0f)) {
             FastVulkanGraphics g = window.getGraphics();
-            while (window.isOpen()) {
-                window.pollEvents();
+            
+            while (window.isOpen() && window.pollEvents()) {
+                // Hardware-locked VSync rendering with zero GC overhead
+                FastDWM.waitForVSync();
+                
                 g.clear(0.08f, 0.08f, 0.08f);
+                
+                // Batch-rendered primitives
                 g.setColor(1.0f, 0.2f, 0.2f, 1.0f);
                 g.fillRect(50, 50, 200, 100);
+                
                 g.setColor(0.2f, 0.6f, 1.0f, 1.0f);
                 g.fillRoundRect(300, 50, 200, 100, 16.0f);
+                
                 window.present();
             }
         }
