@@ -80,7 +80,7 @@ public class DemoImageZoom {
                 frames++;
                 long now = System.currentTimeMillis();
                 if (now - lastFpsTime >= 1000) {
-                    window.setTitle(String.format("FastVulkan Image Zoom — %d FPS | Zoom: %.2fx (Bilinear + Mipmap AA)", frames, zoom));
+                    window.setTitle("FastVulkan FPS:" + frames);
                     frames = 0;
                     lastFpsTime = now;
                 }

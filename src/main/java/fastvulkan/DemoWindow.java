@@ -38,7 +38,7 @@ public class DemoWindow {
                 frames++;
                 long now = System.currentTimeMillis();
                 if (now - lastFpsTime >= 1000) {
-                    window.setTitle("FastVulkan — " + frames + " FPS | Hardware VSync Active");
+                    window.setTitle("FastVulkan FPS:" + frames);
                     frames = 0;
                     lastFpsTime = now;
                 }
