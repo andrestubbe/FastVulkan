@@ -24,19 +24,13 @@ public class Demo {
     public static void main(String[] args) {
         try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan Demo", 1280, 720)) {
             FastVulkanGraphics g = window.getGraphics();
-            
             while (window.isOpen()) {
                 window.pollEvents();
-                
                 g.clear(0.08f, 0.08f, 0.08f);
-                
-                // Batch-rendered primitives
                 g.setColor(1.0f, 0.2f, 0.2f, 1.0f);
                 g.fillRect(50, 50, 200, 100);
-                
                 g.setColor(0.2f, 0.6f, 1.0f, 1.0f);
                 g.fillRoundRect(300, 50, 200, 100, 16.0f);
-                
                 window.present();
             }
         }

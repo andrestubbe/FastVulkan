@@ -51,7 +51,7 @@ public class DemoImageZoom {
 
             // Create smooth continuous FastTween looping between 1.0x (full cover) and 2.2x zoom
             Tween zoomTween = FastTween.to(1.0f, 2.2f, 3500)
-                    .ease(Ease.SINE_IN_OUT)
+                    .ease(Ease.CUBIC_IN_OUT)
                     .yoyo(true)
                     .repeat(-1)
                     .onUpdate(val -> currentZoom = val)
