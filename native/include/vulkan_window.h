@@ -4,6 +4,7 @@
 #include <uxtheme.h>
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_win32.h>
+#include "vulkan_pipeline.h"
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -44,6 +45,22 @@ struct VulkanWindowContext {
     size_t currentFrame = 0;
     const int MAX_FRAMES_IN_FLIGHT = 2;
 
+    // 2D Pipeline & Descriptors
+    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+
+    // Dynamic 2D Vertex Buffer
+    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
+    void* vertexBufferMapped = nullptr;
+    static const size_t MAX_VERTICES = 65536;
+
+    // Active Texture and State
+    VulkanTexture* currentTexture = nullptr;
+    std::vector<Vertex2D> queuedVertices;
+
     // Clear Color (Default: Red as requested)
     float clearR = 0.85f;
     float clearG = 0.15f;
@@ -57,3 +74,8 @@ bool PollWindowEvents(VulkanWindowContext* ctx);
 void RenderAndPresent(VulkanWindowContext* ctx);
 void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a);
 void SetWindowTitle(VulkanWindowContext* ctx, const wchar_t* title);
+
+VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, uint32_t width, uint32_t height, bool generateMipmaps = true);
+void DestroyTexture(VulkanWindowContext* ctx, VulkanTexture* tex);
+void DrawImage(VulkanWindowContext* ctx, VulkanTexture* tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);
+void FlushBatch(VulkanWindowContext* ctx);

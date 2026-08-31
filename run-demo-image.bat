@@ -1,0 +1,21 @@
+@echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+
+echo ========================================
+echo Running FastVulkan Image Zoom & AA Demo
+echo ========================================
+
+:: Build native dll if needed
+if not exist release\fastvulkan.dll (
+    echo Building native fastvulkan.dll...
+    call compile.bat
+)
+
+if not exist release\fastvulkan.dll (
+    echo Error: fastvulkan.dll build failed.
+    exit /b 1
+)
+
+:: Compile and run Java demo quietly
+mvn -q compile exec:java -Dexec.mainClass="fastvulkan.DemoImageZoom"

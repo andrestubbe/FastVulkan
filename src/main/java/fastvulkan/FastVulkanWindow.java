@@ -44,6 +44,35 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    public long createTexture(int[] pixels, int width, int height, boolean mipmaps) {
+        if (nativeHandle == 0) return 0;
+        return nCreateTexture(nativeHandle, pixels, width, height, mipmaps);
+    }
+
+    public void destroyTexture(long texHandle) {
+        if (nativeHandle != 0 && texHandle != 0) {
+            nDestroyTexture(nativeHandle, texHandle);
+        }
+    }
+
+    public void drawImage(long texHandle, float x, float y, float w, float h) {
+        drawImage(texHandle, x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+    }
+
+    public void drawImage(long texHandle, float x, float y, float w, float h,
+                          float u0, float v0, float u1, float v1,
+                          float r, float g, float b, float a) {
+        if (nativeHandle != 0 && texHandle != 0) {
+            nDrawImage(nativeHandle, texHandle, x, y, w, h, u0, v0, u1, v1, r, g, b, a);
+        }
+    }
+
+    public void flushBatch() {
+        if (nativeHandle != 0) {
+            nFlushBatch(nativeHandle);
+        }
+    }
+
     public void present() {
         if (nativeHandle != 0) {
             nRenderAndPresent(nativeHandle);
@@ -70,4 +99,8 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nSetClearColor(long handle, float r, float g, float b, float a);
     private static native void nSetTitle(long handle, String title);
     private static native long nGetHWND(long handle);
+    private static native long nCreateTexture(long handle, int[] pixels, int width, int height, boolean mipmaps);
+    private static native void nDestroyTexture(long handle, long texHandle);
+    private static native void nDrawImage(long handle, long texHandle, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);
+    private static native void nFlushBatch(long handle);
 }

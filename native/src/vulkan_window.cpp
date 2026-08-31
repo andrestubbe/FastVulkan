@@ -403,11 +403,8 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         vkCreateFence(ctx->device, &fenceInfo, nullptr, &ctx->inFlightFences[i]);
     }
 
-    // 9. Pre-warm and clear ALL swapchain buffers before window display
-    for (size_t i = 0; i < ctx->swapChainImages.size(); i++) {
-        RenderAndPresent(ctx);
-    }
-    vkDeviceWaitIdle(ctx->device);
+    // Initialize 2D Shader Pipeline & Dynamic Vertex Buffers
+    Init2DPipeline(ctx);
 
     ShowWindow(ctx->hwnd, SW_SHOW);
     UpdateWindow(ctx->hwnd);
@@ -531,6 +528,78 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
     renderPassInfo.pClearValues = &clearColor;
 
     vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // 2D Rendering Pipeline Dispatch
+    if (ctx->graphicsPipeline != VK_NULL_HANDLE && !ctx->queuedVertices.empty()) {
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->graphicsPipeline);
+
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)ctx->swapChainExtent.width;
+        viewport.height = (float)ctx->swapChainExtent.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = ctx->swapChainExtent;
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+        // Standard 2D Orthographic Projection Matrix (0..Width, 0..Height)
+        float left = 0.0f, right = (float)ctx->swapChainExtent.width;
+        float top = 0.0f, bottom = (float)ctx->swapChainExtent.height;
+        float ortho[16] = {
+            2.0f / (right - left), 0.0f, 0.0f, 0.0f,
+            0.0f, 2.0f / (bottom - top), 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            -(right + left) / (right - left), -(bottom + top) / (bottom - top), 0.0f, 1.0f
+        };
+
+        vkCmdPushConstants(cmd, ctx->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ortho), ortho);
+
+        // Upload and bind dynamic vertex buffer
+        size_t count = (std::min)(ctx->queuedVertices.size(), ctx->MAX_VERTICES);
+        memcpy(ctx->vertexBufferMapped, ctx->queuedVertices.data(), sizeof(Vertex2D) * count);
+
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(cmd, 0, 1, &ctx->vertexBuffer, offsets);
+
+        // Bind Texture Descriptor Set if available
+        if (ctx->currentTexture && ctx->currentTexture->view != VK_NULL_HANDLE) {
+            VkDescriptorSetAllocateInfo setAllocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+            setAllocInfo.descriptorPool = ctx->descriptorPool;
+            setAllocInfo.descriptorSetCount = 1;
+            setAllocInfo.pSetLayouts = &ctx->descriptorSetLayout;
+
+            VkDescriptorSet descSet;
+            if (vkAllocateDescriptorSets(ctx->device, &setAllocInfo, &descSet) == VK_SUCCESS) {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfo.imageView = ctx->currentTexture->view;
+                imageInfo.sampler = ctx->currentTexture->sampler;
+
+                VkWriteDescriptorSet descriptorWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+                descriptorWrite.dstSet = descSet;
+                descriptorWrite.dstBinding = 0;
+                descriptorWrite.dstArrayElement = 0;
+                descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                descriptorWrite.descriptorCount = 1;
+                descriptorWrite.pImageInfo = &imageInfo;
+
+                vkUpdateDescriptorSets(ctx->device, 1, &descriptorWrite, 0, nullptr);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pipelineLayout, 0, 1, &descSet, 0, nullptr);
+            }
+        }
+
+        vkCmdDraw(cmd, (uint32_t)count, 1, 0, 0);
+
+        ctx->queuedVertices.clear();
+        if (ctx->descriptorPool != VK_NULL_HANDLE) {
+            vkResetDescriptorPool(ctx->device, ctx->descriptorPool, 0);
+        }
+    }
 
     // End render pass
     vkCmdEndRenderPass(cmd);
