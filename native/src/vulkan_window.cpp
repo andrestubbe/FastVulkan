@@ -407,8 +407,12 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         vkCreateFence(ctx->device, &fenceInfo, nullptr, &ctx->inFlightFences[i]);
     }
 
-    // 9. Initial paint and make visible with dark theme applied
-    RenderAndPresent(ctx);
+    // 9. Pre-warm and clear ALL swapchain buffers before window display
+    for (size_t i = 0; i < ctx->swapChainImages.size(); i++) {
+        RenderAndPresent(ctx);
+    }
+    vkDeviceWaitIdle(ctx->device);
+
     ShowWindow(ctx->hwnd, SW_SHOW);
     UpdateWindow(ctx->hwnd);
 
