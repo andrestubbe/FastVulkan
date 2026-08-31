@@ -50,16 +50,14 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetClearColor(
 JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetTitle(
     JNIEnv* env, jclass clazz, jlong handle, jstring title) {
     if (handle && title) {
-        const jchar* chars = env->GetStringChars(title, nullptr);
-        jsize len = env->GetStringLength(title);
-        std::wstring wstr;
-        wstr.resize(len);
-        for (jsize i = 0; i < len; i++) {
-            wstr[i] = (wchar_t)chars[i];
+        const char* utf = env->GetStringUTFChars(title, nullptr);
+        if (utf) {
+            auto ctx = (VulkanWindowContext*)handle;
+            if (ctx && ctx->hwnd) {
+                SetWindowTextA(ctx->hwnd, utf);
+            }
+            env->ReleaseStringUTFChars(title, utf);
         }
-        env->ReleaseStringChars(title, chars);
-
-        SetWindowTitle((VulkanWindowContext*)handle, wstr.c_str());
     }
 }
 
