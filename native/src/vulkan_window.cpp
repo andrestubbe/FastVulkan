@@ -181,14 +181,15 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     ctx->height = height;
     ctx->hInstance = GetModuleHandle(nullptr);
 
-    // Register Win32 class with NO default background erase (prevents white frame)
+    // Register Win32 class with Dark Gray/Black Background Brush
+    static HBRUSH hDarkBrush = CreateSolidBrush(RGB(20, 20, 20));
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wc.lpfnWndProc = WndProc;
     wc.hInstance = ctx->hInstance;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wc.hbrBackground = hDarkBrush;
     wc.lpszClassName = WINDOW_CLASS_NAME;
 
     RegisterClassExW(&wc);
