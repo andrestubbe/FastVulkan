@@ -89,6 +89,13 @@ Standard Java GUI toolkits suffer from thread synchronization overhead, laggy wi
 4. 🔄 **2D Shape Batching**: Rectangles, rounded corners, circles, anti-aliased lines.
 5. 🔄 **FastGraphics / FastUI Integration**: Exporting clean abstraction layers for downstream FastJava modules.
 
+## Real-World Use Cases
+
+- 🖥️ **High-FPS UI Frameworks ([FastUI](https://github.com/andrestubbe/FastUI))**: Power complex desktop dashboards, rich vector controls, and live animations with zero GC pauses.
+- 🖼️ **Real-Time Image & Video Viewports**: Seamlessly render, pan, and smoothly zoom 4K/8K bitmaps streamed from **[FastImage](https://github.com/andrestubbe/FastImage)** and **[FastScreen](https://github.com/andrestubbe/FastScreen)**.
+- 🎮 **2D Game Engines & Particle Canvas**: Render tens of thousands of batch-instanced sprites, lines, and HUD shapes at 1000+ FPS.
+- 📊 **Scientific & Financial Charting**: Real-time high-frequency candlestick, waveform, and scatter data visualization with instant window resizing.
+
 ---
 
 ## Installation
