@@ -185,14 +185,19 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     ctx->clearA = clearA;
     ctx->hInstance = GetModuleHandle(nullptr);
 
-    // Register standard Win32 window class
+    // Register Win32 class with exact clear background brush
+    BYTE bR = (BYTE)(clearR * 255.0f);
+    BYTE bG = (BYTE)(clearG * 255.0f);
+    BYTE bB = (BYTE)(clearB * 255.0f);
+    HBRUSH hCustomBrush = CreateSolidBrush(RGB(bR, bG, bB));
+
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wc.lpfnWndProc = WndProc;
     wc.hInstance = ctx->hInstance;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wc.hbrBackground = hCustomBrush;
     wc.lpszClassName = WINDOW_CLASS_NAME;
 
     RegisterClassExW(&wc);
@@ -214,6 +219,15 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     if (!ctx->hwnd) {
         delete ctx;
         return nullptr;
+    }
+
+    // Paint initial background color directly via Win32 GDI before Vulkan starts
+    HDC hdc = GetDC(ctx->hwnd);
+    if (hdc) {
+        RECT clientRect;
+        GetClientRect(ctx->hwnd, &clientRect);
+        FillRect(hdc, &clientRect, hCustomBrush);
+        ReleaseDC(ctx->hwnd, hdc);
     }
 
     // Standard Windows Dark Mode titlebar
