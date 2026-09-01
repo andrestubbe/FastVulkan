@@ -7,10 +7,7 @@ echo Running FastVulkan Window Live-Resize Demo
 echo ========================================
 
 :: Build native dll if needed
-if not exist release\fastvulkan.dll (
-    echo Building native fastvulkan.dll...
-    call compile.bat
-)
+call compile.bat
 
 if not exist release\fastvulkan.dll (
     echo Error: fastvulkan.dll build failed.
