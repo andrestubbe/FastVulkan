@@ -15,33 +15,28 @@
 
 FastVulkan provides a low-overhead GPU-accelerated 2D pipeline (instanced shapes, quad batching, texture rendering, and smooth zoom/transforms) with native C++ window management.
 
+[![FastVulkan Showcase](docs/screenshot.png)](https://github.com/andrestubbe/FastVulkan)
+
 ---
 
 ## Quick Start — Example
 
 ```java
 import fastvulkan.FastVulkanWindow;
-import fastvulkan.FastVulkanGraphics;
 import fastdwm.FastDWM;
+import fasttheme.FastTheme;
 
 public class Demo {
     public static void main(String[] args) {
-        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan Demo", 1280, 720, 0.08f, 0.08f, 0.08f, 1.0f)) {
-            FastVulkanGraphics g = window.getGraphics();
+        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan Demo", 1024, 600, 0.88f, 0.12f, 0.12f, 1.0f)) {
+            long hwnd = window.getHWND();
+            if (hwnd != 0) {
+                FastTheme.setTitleBarDarkMode(hwnd, true);
+                FastTheme.setTitleBarColor(hwnd, 20, 20, 20);
+                FastTheme.setCornerStyle(hwnd, 2);
+            }
             
             while (window.isOpen() && window.pollEvents()) {
-                // Hardware-locked VSync rendering with zero GC overhead
-                FastDWM.waitForVSync();
-                
-                g.clear(0.08f, 0.08f, 0.08f);
-                
-                // Batch-rendered primitives
-                g.setColor(1.0f, 0.2f, 0.2f, 1.0f);
-                g.fillRect(50, 50, 200, 100);
-                
-                g.setColor(0.2f, 0.6f, 1.0f, 1.0f);
-                g.fillRoundRect(300, 50, 200, 100, 16.0f);
-                
                 window.present();
             }
         }
@@ -56,6 +51,7 @@ public class Demo {
 - [Why FastVulkan?](#why-fastvulkan)
 - [Key Features](#key-features)
 - [Architecture & Progressive Roadmap](#architecture--progressive-roadmap)
+- [Real-World Use Cases](#real-world-use-cases)
 - [Installation](#installation)
 - [Documentation](#documentation)
 - [Platform Support](#platform-support)
@@ -82,7 +78,7 @@ Standard Java GUI toolkits suffer from thread synchronization overhead, laggy wi
 - 🪟 **Native Win32 Windowing**: Native `CreateWindowExW` loop with crisp DPI awareness and direct frame presents.
 - ⚡ **Instanced Batching**: Batch thousands of textured quads, rectangles, and rounded shapes in 1 draw call.
 - 🔍 **Smooth Zoom & Viewport Transform**: High-performance pan/zoom matrix math executed entirely on GPU.
-- 📦 **FastJava Ecosystem Ready**: Interoperates seamlessly with **FastGPU**, **FastImage**, **FastUI**, and **FastCore**.
+- 📦 **FastJava Ecosystem Ready**: Interoperates seamlessly with **FastWindow**, **FastGPU**, **FastImage**, **FastUI**, and **FastCore**.
 
 ---
 
@@ -93,6 +89,8 @@ Standard Java GUI toolkits suffer from thread synchronization overhead, laggy wi
 3. 🔄 **Texture & Image Pipeline**: Direct memory bitmap uploads, scaling, and viewport zooming.
 4. 🔄 **2D Shape Batching**: Rectangles, rounded corners, circles, anti-aliased lines.
 5. 🔄 **FastGraphics / FastUI Integration**: Exporting clean abstraction layers for downstream FastJava modules.
+
+---
 
 ## Real-World Use Cases
 
@@ -123,6 +121,13 @@ Add the JitPack repository and the dependency stack to your `pom.xml`:
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastVulkan</artifactId>
         <version>0.1.0</version>
+    </dependency>
+
+    <!-- FastWindow Native Win32 Window Engine -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastWindow</artifactId>
+        <version>0.1.1</version>
     </dependency>
 
     <!-- FastGPU Native Acceleration Engine -->
@@ -171,6 +176,7 @@ repositories {
 
 dependencies {
     implementation 'com.github.andrestubbe:FastVulkan:0.1.0'
+    implementation 'com.github.andrestubbe:FastWindow:0.1.1'
     implementation 'com.github.andrestubbe:fastgpu:0.1.1'
     implementation 'com.github.andrestubbe:FastDWM:0.1.0'
     implementation 'com.github.andrestubbe:FastExecution:0.1.0'
@@ -184,11 +190,12 @@ dependencies {
 Download the required JARs directly to add them to your classpath:
 
 1. 📦 **[FastVulkan-0.1.0.jar](https://github.com/andrestubbe/FastVulkan/releases/download/0.1.0/FastVulkan-0.1.0.jar)** (The Core Library)
-2. ⚡ **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/0.1.1/fastgpu-0.1.1.jar)** (GPU Compute & Memory Foundation)
-3. ⏱️ **[fastdwm-0.1.0.jar](https://github.com/andrestubbe/FastDWM/releases/download/0.1.0/fastdwm-0.1.0.jar)** (Hardware VSync & Timing)
-4. ⚙️ **[fastexecution-0.1.0.jar](https://github.com/andrestubbe/FastExecution/releases/download/0.1.0/fastexecution-0.1.0.jar)** (Precision Scheduling)
-5. 🎨 **[FastTheme-0.1.4.jar](https://github.com/andrestubbe/FastTheme/releases/download/0.1.4/FastTheme-0.1.4.jar)** (Native Window Styling)
-6. 🚀 **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native Loader)
+2. 🪟 **[fastwindow-0.1.1.jar](https://github.com/andrestubbe/FastWindow/releases/download/0.1.1/fastwindow-0.1.1.jar)** (Native Window Engine)
+3. ⚡ **[fastgpu-0.1.1.jar](https://github.com/andrestubbe/FastGPU/releases/download/0.1.1/fastgpu-0.1.1.jar)** (GPU Compute & Memory Foundation)
+4. ⏱️ **[fastdwm-0.1.0.jar](https://github.com/andrestubbe/FastDWM/releases/download/0.1.0/fastdwm-0.1.0.jar)** (Hardware VSync & Timing)
+5. ⚙️ **[fastexecution-0.1.0.jar](https://github.com/andrestubbe/FastExecution/releases/download/0.1.0/fastexecution-0.1.0.jar)** (Precision Scheduling)
+6. 🎨 **[FastTheme-0.1.4.jar](https://github.com/andrestubbe/FastTheme/releases/download/0.1.4/FastTheme-0.1.4.jar)** (Native Window Styling)
+7. 🚀 **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native Loader)
 
 > [!IMPORTANT]
 > All JARs must be included in your classpath for the native Vulkan JNI bindings to function correctly.
@@ -223,6 +230,7 @@ MIT License — Free for commercial and personal use. See [LICENSE](LICENSE) for
 
 ## Related Projects
 
+- [FastWindow](https://github.com/andrestubbe/FastWindow) — Ultra-Fast Win32 Native Window Engine
 - [FastGPU](https://github.com/andrestubbe/FastGPU) — Native GPU compute engine
 - [FastGraphics](https://github.com/andrestubbe/FastGraphics) — Hardware-accelerated DirectX graphics
 - [FastImage](https://github.com/andrestubbe/FastImage) — Native SIMD image processing engine

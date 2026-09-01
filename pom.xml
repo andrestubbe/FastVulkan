@@ -56,6 +56,13 @@
             <version>0.1.4</version>
         </dependency>
 
+        <!-- FastWindow - Ultra-Fast Win32 Native Window Engine -->
+        <dependency>
+            <groupId>com.github.andrestubbe</groupId>
+            <artifactId>FastWindow</artifactId>
+            <version>0.1.1</version>
+        </dependency>
+
         <!-- FastDWM - Native VSync & Windows Timing Substrate -->
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
