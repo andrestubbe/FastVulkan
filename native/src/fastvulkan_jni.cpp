@@ -7,14 +7,13 @@ JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateWindow(
     JNIEnv* env, jclass clazz, jstring title, jint width, jint height, jfloat r, jfloat g, jfloat b, jfloat a) {
     
     if (!title) return 0;
-    const jchar* chars = env->GetStringChars(title, nullptr);
-    jsize len = env->GetStringLength(title);
-    std::wstring wTitle;
-    wTitle.resize(len);
-    for (jsize i = 0; i < len; i++) {
-        wTitle[i] = (wchar_t)chars[i];
-    }
-    env->ReleaseStringChars(title, chars);
+    const char* utf = env->GetStringUTFChars(title, nullptr);
+    if (!utf) return 0;
+
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf, -1, nullptr, 0);
+    std::wstring wTitle(len, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf, -1, &wTitle[0], len);
+    env->ReleaseStringUTFChars(title, utf);
 
     VulkanWindowContext* ctx = CreateVulkanWindow(wTitle.c_str(), width, height, r, g, b, a);
     return (jlong)ctx;
@@ -52,11 +51,15 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetTitle(
     if (handle && title) {
         const char* utf = env->GetStringUTFChars(title, nullptr);
         if (utf) {
+            int len = MultiByteToWideChar(CP_UTF8, 0, utf, -1, nullptr, 0);
+            std::wstring wTitle(len, L'\0');
+            MultiByteToWideChar(CP_UTF8, 0, utf, -1, &wTitle[0], len);
+            env->ReleaseStringUTFChars(title, utf);
+
             auto ctx = (VulkanWindowContext*)handle;
             if (ctx && ctx->hwnd) {
-                SetWindowTextA(ctx->hwnd, utf);
+                SetWindowTextW(ctx->hwnd, wTitle.c_str());
             }
-            env->ReleaseStringUTFChars(title, utf);
         }
     }
 }
