@@ -39,6 +39,7 @@ struct VulkanWindowContext {
 
     // Clear color
     float clearR = 0.0f, clearG = 0.0f, clearB = 0.0f, clearA = 1.0f;
+    bool firstFramePresented = false;
 
     // Vulkan core
     VkInstance instance = VK_NULL_HANDLE;

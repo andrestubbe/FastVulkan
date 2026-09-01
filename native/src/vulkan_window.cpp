@@ -240,14 +240,20 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
 
     RECT wr = { 0, 0, width, height };
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+    int winW = wr.right - wr.left;
+    int winH = wr.bottom - wr.top;
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
+    int posX = max(0, (screenW - winW) / 2);
+    int posY = max(0, (screenH - winH) / 2);
 
     ctx->hwnd = CreateWindowExW(
         WS_EX_APPWINDOW,
         WINDOW_CLASS_NAME,
         title,
         WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        wr.right - wr.left, wr.bottom - wr.top,
+        posX, posY,
+        winW, winH,
         nullptr, nullptr, ctx->hInstance, nullptr
     );
 
@@ -455,9 +461,6 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
 
     // 9. Initialize 2D Shader Pipeline & Dynamic Vertex Buffers
     Init2DPipeline(ctx);
-
-    ShowWindow(ctx->hwnd, SW_SHOW);
-    UpdateWindow(ctx->hwnd);
 
     return ctx;
 }
@@ -865,6 +868,12 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
     presentInfo.pImageIndices = &imageIndex;
 
     result = vkQueuePresentKHR(ctx->graphicsQueue, &presentInfo);
+
+    if (!ctx->firstFramePresented) {
+        ctx->firstFramePresented = true;
+        ShowWindow(ctx->hwnd, SW_SHOW);
+        UpdateWindow(ctx->hwnd);
+    }
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || ctx->resized) {
         ctx->resized = false;
