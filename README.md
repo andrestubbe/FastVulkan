@@ -1,3 +1,6 @@
+> [!WARNING]
+> **🚧 WIP — Active Engine Development & Pipeline Construction in Progress.**
+
 # FastVulkan 0.1.0 [ALPHA-2026-08] — High-Performance Native Vulkan 2D Rendering & Window Engine for Java
 
 [![Status](https://img.shields.io/badge/status-0.1.0-brightgreen.svg)](https://github.com/andrestubbe/FastVulkan/releases/tag/0.1.0)
