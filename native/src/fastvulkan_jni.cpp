@@ -8,14 +8,10 @@ JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateWindow(
     
     if (!title) return 0;
     const jchar* chars = env->GetStringChars(title, nullptr);
-    jsize len = env->GetStringLength(title);
-    std::wstring wTitle;
-    if (chars && len > 0) {
-        wTitle.assign((const wchar_t*)chars, (size_t)len);
-        env->ReleaseStringChars(title, chars);
-    }
+    if (!chars) return 0;
 
-    VulkanWindowContext* ctx = CreateVulkanWindow(wTitle.c_str(), width, height, r, g, b, a);
+    VulkanWindowContext* ctx = CreateVulkanWindow((LPCWSTR)chars, width, height, r, g, b, a);
+    env->ReleaseStringChars(title, chars);
     return (jlong)ctx;
 }
 
@@ -50,14 +46,12 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetTitle(
     JNIEnv* env, jclass clazz, jlong handle, jstring title) {
     if (handle && title) {
         const jchar* chars = env->GetStringChars(title, nullptr);
-        jsize len = env->GetStringLength(title);
-        if (chars && len > 0) {
-            std::wstring wTitle((const wchar_t*)chars, (size_t)len);
-            env->ReleaseStringChars(title, chars);
+        if (chars) {
             auto ctx = (VulkanWindowContext*)handle;
             if (ctx && ctx->hwnd) {
-                SetWindowTextW(ctx->hwnd, wTitle.c_str());
+                SetWindowTextW(ctx->hwnd, (LPCWSTR)chars);
             }
+            env->ReleaseStringChars(title, chars);
         }
     }
 }
