@@ -26,14 +26,7 @@ public class DemoWindow {
             window.setIconImage(createRoundIcon());
 
             long hwnd = window.getHWND();
-            if (hwnd != 0) {
-                // Apply Dark Mode and Black Titlebar styling via FastTheme
-                FastTheme.setTitleBarDarkMode(hwnd, true);
-                FastTheme.setTitleBarColor(hwnd, 20, 20, 20);
-                FastTheme.setTitleBarTextColor(hwnd, 240, 240, 240);
-                FastTheme.setWindowBackgroundColor(hwnd, 20, 20, 20);
-                FastTheme.setCornerStyle(hwnd, 2); // Windows 11 Rounded corners
-            }
+            // Test title without FastTheme interference
 
             // Set background to noticeable Red
             window.setClearColor(0.88f, 0.12f, 0.12f, 1.0f);
