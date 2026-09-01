@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
+#include <vector>
 
 static const wchar_t* WINDOW_CLASS_NAME = L"FastVulkanWindowClass";
 
@@ -22,6 +23,31 @@ static void CleanupSwapChain(VulkanWindowContext* ctx) {
         vkDestroySwapchainKHR(ctx->device, ctx->swapChain, nullptr);
         ctx->swapChain = VK_NULL_HANDLE;
     }
+}
+
+static void SelectSurfaceFormat(VulkanWindowContext* ctx) {
+    uint32_t formatCount = 0;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(ctx->physicalDevice, ctx->surface, &formatCount, nullptr);
+    if (formatCount == 0) {
+        ctx->swapChainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+        return;
+    }
+    std::vector<VkSurfaceFormatKHR> formats(formatCount);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(ctx->physicalDevice, ctx->surface, &formatCount, formats.data());
+
+    for (const auto& f : formats) {
+        if (f.format == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            ctx->swapChainImageFormat = f.format;
+            return;
+        }
+    }
+    for (const auto& f : formats) {
+        if (f.format == VK_FORMAT_R8G8B8A8_UNORM && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            ctx->swapChainImageFormat = f.format;
+            return;
+        }
+    }
+    ctx->swapChainImageFormat = formats[0].format;
 }
 
 static void CreateSwapChain(VulkanWindowContext* ctx) {
@@ -46,6 +72,30 @@ static void CreateSwapChain(VulkanWindowContext* ctx) {
         imageCount = capabilities.maxImageCount;
     }
 
+    // Select optimal Present Mode
+    uint32_t presentModeCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->physicalDevice, ctx->surface, &presentModeCount, nullptr);
+    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    if (presentModeCount > 0) {
+        vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->physicalDevice, ctx->surface, &presentModeCount, presentModes.data());
+    }
+
+    VkPresentModeKHR chosenPresentMode = VK_PRESENT_MODE_FIFO_KHR; // guaranteed
+    for (const auto& mode : presentModes) {
+        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            chosenPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            break;
+        }
+    }
+    if (chosenPresentMode != VK_PRESENT_MODE_MAILBOX_KHR) {
+        for (const auto& mode : presentModes) {
+            if (mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
+                chosenPresentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+                break;
+            }
+        }
+    }
+
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = ctx->surface;
@@ -58,22 +108,7 @@ static void CreateSwapChain(VulkanWindowContext* ctx) {
     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     createInfo.preTransform = capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = VK_PRESENT_MODE_MAILBOX_KHR; // Low latency, fallback to FIFO if needed
-
-    // Check supported present modes
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->physicalDevice, ctx->surface, &presentModeCount, nullptr);
-    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(ctx->physicalDevice, ctx->surface, &presentModeCount, presentModes.data());
-    
-    bool mailboxSupported = false;
-    for (const auto& mode : presentModes) {
-        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) mailboxSupported = true;
-    }
-    if (!mailboxSupported) {
-        createInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    }
-
+    createInfo.presentMode = chosenPresentMode;
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
@@ -83,9 +118,10 @@ static void CreateSwapChain(VulkanWindowContext* ctx) {
 
     ctx->swapChainExtent = extent;
 
-    vkGetSwapchainImagesKHR(ctx->device, ctx->swapChain, &imageCount, nullptr);
-    ctx->swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(ctx->device, ctx->swapChain, &imageCount, ctx->swapChainImages.data());
+    uint32_t count = 0;
+    vkGetSwapchainImagesKHR(ctx->device, ctx->swapChain, &count, nullptr);
+    ctx->swapChainImages.resize(count);
+    vkGetSwapchainImagesKHR(ctx->device, ctx->swapChain, &count, ctx->swapChainImages.data());
 
     ctx->swapChainImageViews.resize(ctx->swapChainImages.size());
     for (size_t i = 0; i < ctx->swapChainImages.size(); i++) {
@@ -129,7 +165,7 @@ static void RecreateSwapChain(VulkanWindowContext* ctx) {
     GetClientRect(ctx->hwnd, &rc);
     int width = rc.right - rc.left;
     int height = rc.bottom - rc.top;
-    if (width == 0 || height == 0) return;
+    if (width <= 0 || height <= 0) return;
 
     vkDeviceWaitIdle(ctx->device);
     CleanupSwapChain(ctx);
@@ -142,14 +178,13 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 
     switch (uMsg) {
     case WM_ERASEBKGND:
-        return 1; // Prevent background erasing flicker
+        return 1;
 
     case WM_SIZE:
         if (ctx) {
             ctx->resized = true;
             if (wParam != SIZE_MINIMIZED) {
                 RecreateSwapChain(ctx);
-                RenderAndPresent(ctx);
             }
         }
         return 0;
@@ -158,7 +193,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         if (ctx) {
             ctx->resized = true;
             RecreateSwapChain(ctx);
-            RenderAndPresent(ctx);
         }
         return 0;
 
@@ -196,7 +230,7 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     ctx->clearA = clearA;
     ctx->hInstance = GetModuleHandle(nullptr);
 
-    // Register standard Win32 window class
+    // Register Win32 window class
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
@@ -208,7 +242,6 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
 
     RegisterClassExW(&wc);
 
-    // Calculate window rectangle
     RECT wr = { 0, 0, width, height };
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
 
@@ -234,55 +267,57 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "FastVulkan";
     appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
-    appInfo.pEngineName = "FastVulkan Engine";
+    appInfo.pEngineName = "FastVulkanEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(0, 1, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_3;
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
-    std::vector<const char*> extensions = {
+    const char* extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME
     };
 
-    VkInstanceCreateInfo instInfo{};
-    instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    instInfo.pApplicationInfo = &appInfo;
-    instInfo.enabledExtensionCount = (uint32_t)extensions.size();
-    instInfo.ppEnabledExtensionNames = extensions.data();
+    VkInstanceCreateInfo createInfoInstance{};
+    createInfoInstance.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfoInstance.pApplicationInfo = &appInfo;
+    createInfoInstance.enabledExtensionCount = 2;
+    createInfoInstance.ppEnabledExtensionNames = extensions;
 
-    if (vkCreateInstance(&instInfo, nullptr, &ctx->instance) != VK_SUCCESS) {
-        // Fallback to 1.2
-        appInfo.apiVersion = VK_API_VERSION_1_2;
-        if (vkCreateInstance(&instInfo, nullptr, &ctx->instance) != VK_SUCCESS) {
-            DestroyWindow(ctx->hwnd);
-            delete ctx;
-            return nullptr;
-        }
-    }
-
-    // 2. Create Win32 Surface
-    VkWin32SurfaceCreateInfoKHR sci{};
-    sci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-    sci.hwnd = ctx->hwnd;
-    sci.hinstance = ctx->hInstance;
-
-    if (vkCreateWin32SurfaceKHR(ctx->instance, &sci, nullptr, &ctx->surface) != VK_SUCCESS) {
-        DestroyVulkanWindow(ctx);
+    if (vkCreateInstance(&createInfoInstance, nullptr, &ctx->instance) != VK_SUCCESS) {
+        DestroyWindow(ctx->hwnd);
+        delete ctx;
         return nullptr;
     }
 
-    // 3. Pick Physical Device & Find Graphics Queue
+    // 2. Win32 Surface
+    VkWin32SurfaceCreateInfoKHR surfaceInfo{};
+    surfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    surfaceInfo.hwnd = ctx->hwnd;
+    surfaceInfo.hinstance = ctx->hInstance;
+
+    if (vkCreateWin32SurfaceKHR(ctx->instance, &surfaceInfo, nullptr, &ctx->surface) != VK_SUCCESS) {
+        vkDestroyInstance(ctx->instance, nullptr);
+        DestroyWindow(ctx->hwnd);
+        delete ctx;
+        return nullptr;
+    }
+
+    // 3. Physical Device Selection
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(ctx->instance, &deviceCount, nullptr);
+    if (deviceCount == 0) {
+        DestroyVulkanWindow(ctx);
+        return nullptr;
+    }
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(ctx->instance, &deviceCount, devices.data());
 
     for (const auto& dev : devices) {
-        uint32_t queueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, nullptr);
-        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, queueFamilies.data());
+        uint32_t queueCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueCount, nullptr);
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueCount, queueFamilies.data());
 
-        for (uint32_t i = 0; i < queueFamilyCount; i++) {
+        for (uint32_t i = 0; i < queueCount; i++) {
             VkBool32 presentSupport = false;
             vkGetPhysicalDeviceSurfaceSupportKHR(dev, i, ctx->surface, &presentSupport);
 
@@ -300,7 +335,17 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         return nullptr;
     }
 
-    // 4. Create Logical Device
+    // Query features & Anisotropy support
+    VkPhysicalDeviceFeatures supportedFeatures{};
+    vkGetPhysicalDeviceFeatures(ctx->physicalDevice, &supportedFeatures);
+    ctx->anisotropySupported = (supportedFeatures.samplerAnisotropy == VK_TRUE);
+    if (ctx->anisotropySupported) {
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(ctx->physicalDevice, &props);
+        ctx->maxAnisotropy = props.limits.maxSamplerAnisotropy;
+    }
+
+    // 4. Logical Device
     float queuePriority = 1.0f;
     VkDeviceQueueCreateInfo queueCreateInfo{};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -308,26 +353,31 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
 
-    std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-
+    const char* deviceExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     VkPhysicalDeviceFeatures deviceFeatures{};
+    if (ctx->anisotropySupported) {
+        deviceFeatures.samplerAnisotropy = VK_TRUE;
+    }
 
-    VkDeviceCreateInfo devInfo{};
-    devInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    devInfo.queueCreateInfoCount = 1;
-    devInfo.pQueueCreateInfos = &queueCreateInfo;
-    devInfo.pEnabledFeatures = &deviceFeatures;
-    devInfo.enabledExtensionCount = (uint32_t)deviceExtensions.size();
-    devInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    VkDeviceCreateInfo deviceCreateInfo{};
+    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceCreateInfo.queueCreateInfoCount = 1;
+    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceCreateInfo.enabledExtensionCount = 1;
+    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions;
+    deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-    if (vkCreateDevice(ctx->physicalDevice, &devInfo, nullptr, &ctx->device) != VK_SUCCESS) {
+    if (vkCreateDevice(ctx->physicalDevice, &deviceCreateInfo, nullptr, &ctx->device) != VK_SUCCESS) {
         DestroyVulkanWindow(ctx);
         return nullptr;
     }
 
     vkGetDeviceQueue(ctx->device, ctx->queueFamilyIndex, 0, &ctx->graphicsQueue);
 
-    // 5. Create Render Pass
+    // Select Surface Format before Render Pass creation
+    SelectSurfaceFormat(ctx);
+
+    // 5. Render Pass
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = ctx->swapChainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -355,41 +405,44 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    VkRenderPassCreateInfo rpInfo{};
-    rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    rpInfo.attachmentCount = 1;
-    rpInfo.pAttachments = &colorAttachment;
-    rpInfo.subpassCount = 1;
-    rpInfo.pSubpasses = &subpass;
-    rpInfo.dependencyCount = 1;
-    rpInfo.pDependencies = &dependency;
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+    renderPassInfo.dependencyCount = 1;
+    renderPassInfo.pDependencies = &dependency;
 
-    if (vkCreateRenderPass(ctx->device, &rpInfo, nullptr, &ctx->renderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(ctx->device, &renderPassInfo, nullptr, &ctx->renderPass) != VK_SUCCESS) {
         DestroyVulkanWindow(ctx);
         return nullptr;
     }
 
-    // 6. Create SwapChain
+    // 6. Swapchain
     CreateSwapChain(ctx);
 
-    // 7. Create Command Pool & Buffers
+    // 7. Command Pool & Command Buffers
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = ctx->queueFamilyIndex;
 
-    vkCreateCommandPool(ctx->device, &poolInfo, nullptr, &ctx->commandPool);
+    if (vkCreateCommandPool(ctx->device, &poolInfo, nullptr, &ctx->commandPool) != VK_SUCCESS) {
+        DestroyVulkanWindow(ctx);
+        return nullptr;
+    }
 
     ctx->commandBuffers.resize(ctx->MAX_FRAMES_IN_FLIGHT);
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = ctx->commandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = (uint32_t)ctx->commandBuffers.size();
+    VkCommandBufferAllocateInfo allocInfoCmd{};
+    allocInfoCmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfoCmd.commandPool = ctx->commandPool;
+    allocInfoCmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfoCmd.commandBufferCount = (uint32_t)ctx->commandBuffers.size();
 
-    vkAllocateCommandBuffers(ctx->device, &allocInfo, ctx->commandBuffers.data());
+    vkAllocateCommandBuffers(ctx->device, &allocInfoCmd, ctx->commandBuffers.data());
 
-    // 8. Create Sync Objects
+    // 8. Synchronization Objects
     ctx->imageAvailableSemaphores.resize(ctx->MAX_FRAMES_IN_FLIGHT);
     ctx->renderFinishedSemaphores.resize(ctx->MAX_FRAMES_IN_FLIGHT);
     ctx->inFlightFences.resize(ctx->MAX_FRAMES_IN_FLIGHT);
@@ -404,7 +457,7 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         vkCreateFence(ctx->device, &fenceInfo, nullptr, &ctx->inFlightFences[i]);
     }
 
-    // Initialize 2D Shader Pipeline & Dynamic Vertex Buffers
+    // 9. Initialize 2D Shader Pipeline & Dynamic Vertex Buffers
     Init2DPipeline(ctx);
 
     ShowWindow(ctx->hwnd, SW_SHOW);
@@ -419,6 +472,22 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
     if (ctx->device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(ctx->device);
 
+        if (ctx->graphicsPipeline) { vkDestroyPipeline(ctx->device, ctx->graphicsPipeline, nullptr); ctx->graphicsPipeline = VK_NULL_HANDLE; }
+        if (ctx->pipelineLayout) { vkDestroyPipelineLayout(ctx->device, ctx->pipelineLayout, nullptr); ctx->pipelineLayout = VK_NULL_HANDLE; }
+        if (ctx->descriptorSetLayout) { vkDestroyDescriptorSetLayout(ctx->device, ctx->descriptorSetLayout, nullptr); ctx->descriptorSetLayout = VK_NULL_HANDLE; }
+        if (ctx->descriptorPool) { vkDestroyDescriptorPool(ctx->device, ctx->descriptorPool, nullptr); ctx->descriptorPool = VK_NULL_HANDLE; }
+
+        if (ctx->vertexBuffer) {
+            if (ctx->vertexBufferMapped) {
+                vkUnmapMemory(ctx->device, ctx->vertexBufferMemory);
+                ctx->vertexBufferMapped = nullptr;
+            }
+            vkDestroyBuffer(ctx->device, ctx->vertexBuffer, nullptr);
+            ctx->vertexBuffer = VK_NULL_HANDLE;
+            vkFreeMemory(ctx->device, ctx->vertexBufferMemory, nullptr);
+            ctx->vertexBufferMemory = VK_NULL_HANDLE;
+        }
+
         for (int i = 0; i < ctx->MAX_FRAMES_IN_FLIGHT; i++) {
             if (ctx->imageAvailableSemaphores.size() > i && ctx->imageAvailableSemaphores[i] != VK_NULL_HANDLE)
                 vkDestroySemaphore(ctx->device, ctx->imageAvailableSemaphores[i], nullptr);
@@ -428,11 +497,11 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
                 vkDestroyFence(ctx->device, ctx->inFlightFences[i], nullptr);
         }
 
+        CleanupSwapChain(ctx);
+
         if (ctx->commandPool != VK_NULL_HANDLE) {
             vkDestroyCommandPool(ctx->device, ctx->commandPool, nullptr);
         }
-
-        CleanupSwapChain(ctx);
 
         if (ctx->renderPass != VK_NULL_HANDLE) {
             vkDestroyRenderPass(ctx->device, ctx->renderPass, nullptr);
@@ -441,11 +510,10 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
         vkDestroyDevice(ctx->device, nullptr);
     }
 
-    if (ctx->surface != VK_NULL_HANDLE) {
-        vkDestroySurfaceKHR(ctx->instance, ctx->surface, nullptr);
-    }
-
     if (ctx->instance != VK_NULL_HANDLE) {
+        if (ctx->surface != VK_NULL_HANDLE) {
+            vkDestroySurfaceKHR(ctx->instance, ctx->surface, nullptr);
+        }
         vkDestroyInstance(ctx->instance, nullptr);
     }
 
@@ -457,13 +525,12 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
 }
 
 bool PollWindowEvents(VulkanWindowContext* ctx) {
-    if (!ctx || ctx->shouldClose) return false;
+    if (!ctx || !ctx->hwnd) return false;
 
     MSG msg;
     while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT) {
             ctx->shouldClose = true;
-            return false;
         }
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -573,7 +640,6 @@ void SetWindowFullscreen(VulkanWindowContext* ctx, bool fullscreen) {
     if (!ctx || !ctx->hwnd || ctx->isFullscreen == fullscreen) return;
 
     if (fullscreen) {
-        // Save current window geometry and style
         GetWindowRect(ctx->hwnd, &ctx->savedWindowRect);
         ctx->savedStyle = (DWORD)GetWindowLong(ctx->hwnd, GWL_STYLE);
         ctx->savedExStyle = (DWORD)GetWindowLong(ctx->hwnd, GWL_EXSTYLE);
@@ -591,7 +657,6 @@ void SetWindowFullscreen(VulkanWindowContext* ctx, bool fullscreen) {
             ctx->isFullscreen = true;
         }
     } else {
-        // Restore windowed style and geometry
         SetWindowLong(ctx->hwnd, GWL_STYLE, ctx->savedStyle);
         SetWindowLong(ctx->hwnd, GWL_EXSTYLE, ctx->savedExStyle);
         SetWindowPos(ctx->hwnd, HWND_NOTOPMOST,
@@ -698,7 +763,7 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
         scissor.extent = ctx->swapChainExtent;
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-        // Standard 2D Orthographic Projection Matrix (0..Width, 0..Height)
+        // Ortho Projection Matrix
         float left = 0.0f, right = (float)ctx->swapChainExtent.width;
         float top = 0.0f, bottom = (float)ctx->swapChainExtent.height;
         float ortho[16] = {
@@ -710,51 +775,24 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
 
         vkCmdPushConstants(cmd, ctx->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ortho), ortho);
 
-        // Upload and bind dynamic vertex buffer
         size_t count = (std::min)(ctx->queuedVertices.size(), ctx->MAX_VERTICES);
         memcpy(ctx->vertexBufferMapped, ctx->queuedVertices.data(), sizeof(Vertex2D) * count);
 
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(cmd, 0, 1, &ctx->vertexBuffer, offsets);
 
-        // Bind Texture Descriptor Set if available
-        if (ctx->currentTexture && ctx->currentTexture->view != VK_NULL_HANDLE) {
-            VkDescriptorSetAllocateInfo setAllocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-            setAllocInfo.descriptorPool = ctx->descriptorPool;
-            setAllocInfo.descriptorSetCount = 1;
-            setAllocInfo.pSetLayouts = &ctx->descriptorSetLayout;
-
-            VkDescriptorSet descSet;
-            if (vkAllocateDescriptorSets(ctx->device, &setAllocInfo, &descSet) == VK_SUCCESS) {
-                VkDescriptorImageInfo imageInfo{};
-                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = ctx->currentTexture->view;
-                imageInfo.sampler = ctx->currentTexture->sampler;
-
-                VkWriteDescriptorSet descriptorWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-                descriptorWrite.dstSet = descSet;
-                descriptorWrite.dstBinding = 0;
-                descriptorWrite.dstArrayElement = 0;
-                descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                descriptorWrite.descriptorCount = 1;
-                descriptorWrite.pImageInfo = &imageInfo;
-
-                vkUpdateDescriptorSets(ctx->device, 1, &descriptorWrite, 0, nullptr);
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx->pipelineLayout, 0, 1, &descSet, 0, nullptr);
-            }
+        // Bind cached Descriptor Set from texture directly (no per-frame allocations)
+        if (ctx->currentTexture && ctx->currentTexture->descriptorSet != VK_NULL_HANDLE) {
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    ctx->pipelineLayout, 0, 1,
+                                    &ctx->currentTexture->descriptorSet, 0, nullptr);
         }
 
         vkCmdDraw(cmd, (uint32_t)count, 1, 0, 0);
-
         ctx->queuedVertices.clear();
-        if (ctx->descriptorPool != VK_NULL_HANDLE) {
-            vkResetDescriptorPool(ctx->device, ctx->descriptorPool, 0);
-        }
     }
 
-    // End render pass
     vkCmdEndRenderPass(cmd);
-
     vkEndCommandBuffer(cmd);
 
     VkSubmitInfo submitInfo{};

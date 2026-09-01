@@ -1,11 +1,11 @@
 #include "vulkan_window.h"
-#include "vulkan_pipeline.h"
 #include <fstream>
 #include <vector>
 #include <stdexcept>
 #include <cmath>
 #include <cstring>
 #include <iostream>
+#include <algorithm>
 
 static uint32_t FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
@@ -15,13 +15,12 @@ static uint32_t FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFil
             return i;
         }
     }
-    return 0;
+    return UINT32_MAX;
 }
 
 static std::vector<char> ReadShaderFile(const std::string& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
     if (!file.is_open()) {
-        // Fallback search in src/main/resources/shaders
         std::string alt = "src/main/resources/shaders/" + filename;
         file.open(alt, std::ios::ate | std::ios::binary);
     }
@@ -68,7 +67,9 @@ void Init2DPipeline(VulkanWindowContext* ctx) {
     layoutInfo.bindingCount = 1;
     layoutInfo.pBindings = &samplerLayoutBinding;
 
-    vkCreateDescriptorSetLayout(ctx->device, &layoutInfo, nullptr, &ctx->descriptorSetLayout);
+    if (vkCreateDescriptorSetLayout(ctx->device, &layoutInfo, nullptr, &ctx->descriptorSetLayout) != VK_SUCCESS) {
+        return;
+    }
 
     // 2. Push Constants for 4x4 Ortho Matrix (16 floats = 64 bytes)
     VkPushConstantRange pushConstantRange{};
@@ -83,7 +84,9 @@ void Init2DPipeline(VulkanWindowContext* ctx) {
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-    vkCreatePipelineLayout(ctx->device, &pipelineLayoutInfo, nullptr, &ctx->pipelineLayout);
+    if (vkCreatePipelineLayout(ctx->device, &pipelineLayoutInfo, nullptr, &ctx->pipelineLayout) != VK_SUCCESS) {
+        return;
+    }
 
     // 3. Shaders
     auto vertCode = ReadShaderFile("shader_vert.spv");
@@ -112,17 +115,16 @@ void Init2DPipeline(VulkanWindowContext* ctx) {
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     VkVertexInputAttributeDescription attributeDescriptions[3]{};
-    // Position (vec2)
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
     attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
     attributeDescriptions[0].offset = offsetof(Vertex2D, x);
-    // TexCoord (vec2)
+
     attributeDescriptions[1].binding = 0;
     attributeDescriptions[1].location = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
     attributeDescriptions[1].offset = offsetof(Vertex2D, u);
-    // Color (vec4)
+
     attributeDescriptions[2].binding = 0;
     attributeDescriptions[2].location = 2;
     attributeDescriptions[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -157,7 +159,6 @@ void Init2DPipeline(VulkanWindowContext* ctx) {
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Alpha Blending
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_TRUE;
@@ -263,7 +264,10 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-    vkCreateImage(ctx->device, &imageInfo, nullptr, &tex->image);
+    if (vkCreateImage(ctx->device, &imageInfo, nullptr, &tex->image) != VK_SUCCESS) {
+        delete tex;
+        return nullptr;
+    }
 
     VkMemoryRequirements memReqs;
     vkGetImageMemoryRequirements(ctx->device, tex->image, &memReqs);
@@ -272,7 +276,11 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     allocInfo.allocationSize = memReqs.size;
     allocInfo.memoryTypeIndex = FindMemoryType(ctx->physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkAllocateMemory(ctx->device, &allocInfo, nullptr, &tex->memory);
+    if (vkAllocateMemory(ctx->device, &allocInfo, nullptr, &tex->memory) != VK_SUCCESS) {
+        vkDestroyImage(ctx->device, tex->image, nullptr);
+        delete tex;
+        return nullptr;
+    }
     vkBindImageMemory(ctx->device, tex->image, tex->memory, 0);
 
     // Staging Buffer
@@ -300,7 +308,7 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     memcpy(data, pixels, (size_t)imageSize);
     vkUnmapMemory(ctx->device, stagingMemory);
 
-    // Copy to Image using single-time command buffer
+    // Copy to Image using command buffer
     VkCommandBufferAllocateInfo cmdAlloc{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     cmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdAlloc.commandPool = ctx->commandPool;
@@ -313,7 +321,6 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(copyCmd, &beginInfo);
 
-    // Transition to DST_OPTIMAL
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -339,8 +346,12 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
 
     vkCmdCopyBufferToImage(copyCmd, stagingBuffer, tex->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-    // Generate Mipmaps or transition to SHADER_READ_ONLY_OPTIMAL
-    if (!generateMipmaps || mipLevels == 1) {
+    // Check blitting feature support
+    VkFormatProperties formatProps;
+    vkGetPhysicalDeviceFormatProperties(ctx->physicalDevice, VK_FORMAT_B8G8R8A8_UNORM, &formatProps);
+    bool canBlit = (formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0;
+
+    if (!generateMipmaps || mipLevels == 1 || !canBlit) {
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -421,17 +432,20 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(ctx->device, &viewInfo, nullptr, &tex->view);
+    if (vkCreateImageView(ctx->device, &viewInfo, nullptr, &tex->view) != VK_SUCCESS) {
+        DestroyTexture(ctx, tex);
+        return nullptr;
+    }
 
-    // Create Sampler with Bilinear & Mipmap Antialiasing
+    // Create Sampler with queried Anisotropy
     VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
     samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = 16.0f;
+    samplerInfo.anisotropyEnable = ctx->anisotropySupported ? VK_TRUE : VK_FALSE;
+    samplerInfo.maxAnisotropy = ctx->anisotropySupported ? ctx->maxAnisotropy : 1.0f;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = VK_FALSE;
@@ -439,7 +453,34 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = (float)mipLevels;
 
-    vkCreateSampler(ctx->device, &samplerInfo, nullptr, &tex->sampler);
+    if (vkCreateSampler(ctx->device, &samplerInfo, nullptr, &tex->sampler) != VK_SUCCESS) {
+        DestroyTexture(ctx, tex);
+        return nullptr;
+    }
+
+    // Preallocate & cache descriptor set once for this texture
+    if (ctx->descriptorPool != VK_NULL_HANDLE && ctx->descriptorSetLayout != VK_NULL_HANDLE) {
+        VkDescriptorSetAllocateInfo setAllocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        setAllocInfo.descriptorPool = ctx->descriptorPool;
+        setAllocInfo.descriptorSetCount = 1;
+        setAllocInfo.pSetLayouts = &ctx->descriptorSetLayout;
+
+        if (vkAllocateDescriptorSets(ctx->device, &setAllocInfo, &tex->descriptorSet) == VK_SUCCESS) {
+            VkDescriptorImageInfo descImageInfo{};
+            descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            descImageInfo.imageView = tex->view;
+            descImageInfo.sampler = tex->sampler;
+
+            VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            write.dstSet = tex->descriptorSet;
+            write.dstBinding = 0;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write.descriptorCount = 1;
+            write.pImageInfo = &descImageInfo;
+
+            vkUpdateDescriptorSets(ctx->device, 1, &write, 0, nullptr);
+        }
+    }
 
     return tex;
 }
@@ -448,23 +489,26 @@ void DestroyTexture(VulkanWindowContext* ctx, VulkanTexture* tex) {
     if (!ctx || !tex) return;
     if (ctx->device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(ctx->device);
-        if (tex->sampler) vkDestroySampler(ctx->device, tex->sampler, nullptr);
-        if (tex->view) vkDestroyImageView(ctx->device, tex->view, nullptr);
-        if (tex->image) vkDestroyImage(ctx->device, tex->image, nullptr);
-        if (tex->memory) vkFreeMemory(ctx->device, tex->memory, nullptr);
+        if (tex->descriptorSet != VK_NULL_HANDLE && ctx->descriptorPool != VK_NULL_HANDLE) {
+            vkFreeDescriptorSets(ctx->device, ctx->descriptorPool, 1, &tex->descriptorSet);
+            tex->descriptorSet = VK_NULL_HANDLE;
+        }
+        if (tex->sampler) { vkDestroySampler(ctx->device, tex->sampler, nullptr); tex->sampler = VK_NULL_HANDLE; }
+        if (tex->view) { vkDestroyImageView(ctx->device, tex->view, nullptr); tex->view = VK_NULL_HANDLE; }
+        if (tex->image) { vkDestroyImage(ctx->device, tex->image, nullptr); tex->image = VK_NULL_HANDLE; }
+        if (tex->memory) { vkFreeMemory(ctx->device, tex->memory, nullptr); tex->memory = VK_NULL_HANDLE; }
     }
     delete tex;
 }
 
 void DrawImage(VulkanWindowContext* ctx, VulkanTexture* tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a) {
-    if (!ctx) return;
+    if (!ctx || w <= 0.0f || h <= 0.0f) return;
 
     if (ctx->currentTexture != tex) {
         FlushBatch(ctx);
         ctx->currentTexture = tex;
     }
 
-    // 2 Triangles forming a quad
     Vertex2D v00 = { x,     y,     u0, v0, r, g, b, a };
     Vertex2D v10 = { x + w, y,     u1, v0, r, g, b, a };
     Vertex2D v11 = { x + w, y + h, u1, v1, r, g, b, a };
@@ -484,6 +528,4 @@ void FlushBatch(VulkanWindowContext* ctx) {
 
     size_t count = (std::min)(ctx->queuedVertices.size(), ctx->MAX_VERTICES);
     memcpy(ctx->vertexBufferMapped, ctx->queuedVertices.data(), sizeof(Vertex2D) * count);
-
-    // The active draw call is encoded during RenderAndPresent pass
 }
