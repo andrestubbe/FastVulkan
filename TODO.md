@@ -1,7 +1,7 @@
 # FastVulkan Roadmap & Open TODOs
 
 ## 🐛 Known Issues / Fixes
-- [ ] **Titelleisten-Text ("F"-Bug)**: Win32 UTF-16 / ANSI-Zeichenkodierung bei `SetWindowText` korrigieren, damit der vollständige Titel angezeigt wird.
+- [x] **Titelleisten-Text ("F"-Bug)**: Win32 UTF-16 / ANSI-Zeichenkodierung bei `SetWindowText` korrigieren, damit der vollständige Titel angezeigt wird.
 - [ ] **Initialer Frame-Flash**: Letzte verbleibende 1-Frame-Hintergrundartefakte vor dem ersten Vulkan-Present vollständig beseitigen.
 - [ ] **Zero-Load Background Pause**: Bei `SIZE_MINIMIZED` und virtuellem Desktop-Wechsel (DWM Cloaked) den Loop komplett ohne CPU/GPU-Last pausieren (`0 FPS` on demand).
 
