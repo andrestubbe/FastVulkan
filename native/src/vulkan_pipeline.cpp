@@ -272,9 +272,16 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     VkMemoryRequirements memReqs;
     vkGetImageMemoryRequirements(ctx->device, tex->image, &memReqs);
 
+    uint32_t imageMemType = FindMemoryType(ctx->physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (imageMemType == UINT32_MAX) {
+        vkDestroyImage(ctx->device, tex->image, nullptr);
+        delete tex;
+        return nullptr;
+    }
+
     VkMemoryAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     allocInfo.allocationSize = memReqs.size;
-    allocInfo.memoryTypeIndex = FindMemoryType(ctx->physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    allocInfo.memoryTypeIndex = imageMemType;
 
     if (vkAllocateMemory(ctx->device, &allocInfo, nullptr, &tex->memory) != VK_SUCCESS) {
         vkDestroyImage(ctx->device, tex->image, nullptr);
@@ -293,20 +300,46 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     stageBufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     stageBufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    vkCreateBuffer(ctx->device, &stageBufInfo, nullptr, &stagingBuffer);
+    if (vkCreateBuffer(ctx->device, &stageBufInfo, nullptr, &stagingBuffer) != VK_SUCCESS) {
+        DestroyTexture(ctx, tex);
+        return nullptr;
+    }
     vkGetBufferMemoryRequirements(ctx->device, stagingBuffer, &memReqs);
+
+    uint32_t stageMemType = FindMemoryType(ctx->physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (stageMemType == UINT32_MAX) {
+        vkDestroyBuffer(ctx->device, stagingBuffer, nullptr);
+        DestroyTexture(ctx, tex);
+        return nullptr;
+    }
 
     VkMemoryAllocateInfo stageAlloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     stageAlloc.allocationSize = memReqs.size;
-    stageAlloc.memoryTypeIndex = FindMemoryType(ctx->physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    stageAlloc.memoryTypeIndex = stageMemType;
 
-    vkAllocateMemory(ctx->device, &stageAlloc, nullptr, &stagingMemory);
+    if (vkAllocateMemory(ctx->device, &stageAlloc, nullptr, &stagingMemory) != VK_SUCCESS) {
+        vkDestroyBuffer(ctx->device, stagingBuffer, nullptr);
+        DestroyTexture(ctx, tex);
+        return nullptr;
+    }
     vkBindBufferMemory(ctx->device, stagingBuffer, stagingMemory, 0);
 
-    void* data;
-    vkMapMemory(ctx->device, stagingMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, (size_t)imageSize);
-    vkUnmapMemory(ctx->device, stagingMemory);
+    void* data = nullptr;
+    if (vkMapMemory(ctx->device, stagingMemory, 0, imageSize, 0, &data) == VK_SUCCESS) {
+        // Fast conversion from Java ARGB (0xAARRGGBB) to Vulkan BGRA (0xAABBGGRR)
+        uint32_t* dst = (uint32_t*)data;
+        const uint32_t* src = pixels;
+        const size_t pixelCount = (size_t)width * height;
+
+        for (size_t i = 0; i < pixelCount; ++i) {
+            uint32_t p = src[i];
+            dst[i] = ((p & 0x000000FF) << 16) |  // B
+                     ((p & 0x0000FF00))       |  // G
+                     ((p & 0x00FF0000) >> 16) |  // R
+                     ((p & 0xFF000000));         // A
+        }
+        vkUnmapMemory(ctx->device, stagingMemory);
+    }
 
     // Copy to Image using command buffer
     VkCommandBufferAllocateInfo cmdAlloc{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };

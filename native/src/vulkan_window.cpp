@@ -183,16 +183,12 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     case WM_SIZE:
         if (ctx) {
             ctx->resized = true;
-            if (wParam != SIZE_MINIMIZED) {
-                RecreateSwapChain(ctx);
-            }
         }
         return 0;
 
     case WM_SIZING:
         if (ctx) {
             ctx->resized = true;
-            RecreateSwapChain(ctx);
         }
         return 0;
 
@@ -702,6 +698,10 @@ void SetWindowMaxSize(VulkanWindowContext* ctx, int maxW, int maxH) {
 
 void RenderAndPresent(VulkanWindowContext* ctx) {
     if (!ctx || ctx->device == VK_NULL_HANDLE || ctx->swapChain == VK_NULL_HANDLE) return;
+
+    if (ctx->resized) {
+        RecreateSwapChain(ctx);
+    }
 
     vkWaitForFences(ctx->device, 1, &ctx->inFlightFences[ctx->currentFrame], VK_TRUE, UINT64_MAX);
 
