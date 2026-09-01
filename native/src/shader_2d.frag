@@ -8,5 +8,11 @@ layout(location = 0) out vec4 outColor;
 layout(binding = 0) uniform sampler2D texSampler;
 
 void main() {
-    outColor = texture(texSampler, fragTexCoord) * fragColor;
+    if (fragTexCoord.x < 0.0) {
+        // Colored quad mode — no texture, pure vertex color
+        outColor = fragColor;
+    } else {
+        // Textured quad mode
+        outColor = texture(texSampler, fragTexCoord) * fragColor;
+    }
 }

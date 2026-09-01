@@ -304,17 +304,14 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
         DestroyTexture(ctx, tex);
         return nullptr;
     }
-    vkGetBufferMemoryRequirements(ctx->device, stagingBuffer, &memReqs);
+    VkMemoryRequirements stageReqs;
+    vkGetBufferMemoryRequirements(ctx->device, stagingBuffer, &stageReqs);
 
-    uint32_t stageMemType = FindMemoryType(ctx->physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (stageMemType == UINT32_MAX) {
-        vkDestroyBuffer(ctx->device, stagingBuffer, nullptr);
-        DestroyTexture(ctx, tex);
-        return nullptr;
-    }
+    uint32_t stageMemType = FindMemoryType(ctx->physicalDevice, stageReqs.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     VkMemoryAllocateInfo stageAlloc{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    stageAlloc.allocationSize = memReqs.size;
+    stageAlloc.allocationSize = stageReqs.size;
     stageAlloc.memoryTypeIndex = stageMemType;
 
     if (vkAllocateMemory(ctx->device, &stageAlloc, nullptr, &stagingMemory) != VK_SUCCESS) {
@@ -326,18 +323,9 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
 
     void* data = nullptr;
     if (vkMapMemory(ctx->device, stagingMemory, 0, imageSize, 0, &data) == VK_SUCCESS) {
-        // Fast conversion from Java ARGB (0xAARRGGBB) to Vulkan BGRA (0xAABBGGRR)
-        uint32_t* dst = (uint32_t*)data;
-        const uint32_t* src = pixels;
-        const size_t pixelCount = (size_t)width * height;
-
-        for (size_t i = 0; i < pixelCount; ++i) {
-            uint32_t p = src[i];
-            dst[i] = ((p & 0x000000FF) << 16) |  // B
-                     ((p & 0x0000FF00))       |  // G
-                     ((p & 0x00FF0000) >> 16) |  // R
-                     ((p & 0xFF000000));         // A
-        }
+        // Direct zero-overhead copy: Java 0xAARRGGBB in little-endian byte order is memory [B, G, R, A],
+        // which matches VK_FORMAT_B8G8R8A8_UNORM pixel-for-pixel with 0 byte manipulation.
+        memcpy(data, pixels, (size_t)imageSize);
         vkUnmapMemory(ctx->device, stagingMemory);
     }
 
@@ -371,20 +359,19 @@ VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, u
     vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
     VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.mipLevel = 0;
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
+    region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { width, height, 1 };
 
     vkCmdCopyBufferToImage(copyCmd, stagingBuffer, tex->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-    // Check blitting feature support
-    VkFormatProperties formatProps;
-    vkGetPhysicalDeviceFormatProperties(ctx->physicalDevice, VK_FORMAT_B8G8R8A8_UNORM, &formatProps);
-    bool canBlit = (formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0;
-
-    if (!generateMipmaps || mipLevels == 1 || !canBlit) {
+    if (mipLevels == 1) {
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;

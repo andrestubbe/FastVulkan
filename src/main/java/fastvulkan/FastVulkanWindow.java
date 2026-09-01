@@ -12,7 +12,7 @@ public class FastVulkanWindow implements AutoCloseable {
     private final long hwnd;
 
     public FastVulkanWindow(String title, int width, int height) {
-        this(title, width, height, 0.88f, 0.12f, 0.12f, 1.0f);
+        this(title, width, height, 0.098f, 0.098f, 0.098f, 1.0f);
     }
 
     public FastVulkanWindow(String title, int width, int height, float clearR, float clearG, float clearB, float clearA) {
@@ -196,6 +196,31 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    public boolean isKeyDown(int keyCode) {
+        if (nativeHandle == 0) return false;
+        return nIsKeyDown(nativeHandle, keyCode);
+    }
+
+    public boolean isKeyJustPressed(int keyCode) {
+        if (nativeHandle == 0) return false;
+        return nIsKeyJustPressed(nativeHandle, keyCode);
+    }
+
+    public int getMouseX() {
+        if (nativeHandle == 0) return 0;
+        return nGetMouseX(nativeHandle);
+    }
+
+    public int getMouseY() {
+        if (nativeHandle == 0) return 0;
+        return nGetMouseY(nativeHandle);
+    }
+
+    public boolean isMouseButtonDown(int button) {
+        if (nativeHandle == 0) return false;
+        return nIsMouseButtonDown(nativeHandle, button);
+    }
+
     @Override
     public void close() {
         if (nativeHandle != 0) {
@@ -235,4 +260,15 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nDestroyTexture(long handle, long texHandle);
     private static native void nDrawImage(long handle, long texHandle, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);
     private static native void nFlushBatch(long handle);
+    private static native boolean nIsKeyDown(long handle, int keyCode);
+    private static native boolean nIsKeyJustPressed(long handle, int keyCode);
+    private static native int nGetMouseX(long handle);
+    private static native int nGetMouseY(long handle);
+    private static native boolean nIsMouseButtonDown(long handle, int button);
+
+    public void drawColoredRect(float x, float y, float w, float h, float r, float g, float b, float a) {
+        if (nativeHandle != 0) nDrawColoredRect(nativeHandle, x, y, w, h, r, g, b, a);
+    }
+
+    private static native void nDrawColoredRect(long handle, float x, float y, float w, float h, float r, float g, float b, float a);
 }

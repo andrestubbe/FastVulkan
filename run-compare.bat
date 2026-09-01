@@ -7,16 +7,16 @@ if exist "C:\Users\andre\tools\apache-maven-3.9.9\bin" set PATH=C:\Users\andre\t
 if defined VULKAN_SDK set PATH=%VULKAN_SDK%\Bin;%PATH%
 if exist "C:\Program Files\VulkanSDK\1.4.357.0\Bin" set PATH=C:\Program Files\VulkanSDK\1.4.357.0\Bin;%PATH%
 
-echo ========================================
-echo Running FastVulkan Image Zoom ^& AA Demo
-echo ========================================
+echo ========================================================
+echo  FastVulkan vs Java2D 1:1 Pixel Calibration Suite
+echo ========================================================
 
 if not exist release\fastvulkan.dll (
     echo Building native fastvulkan.dll...
     call compile.bat
 )
 if not exist release\fastvulkan.dll (
-    echo Error: fastvulkan.dll build failed.
+    echo Error: DLL build failed.
     pause
     exit /b 1
 )
@@ -37,13 +37,13 @@ if not exist "%FASTCORE_DIR%" mkdir "%FASTCORE_DIR%"
 copy /Y "release\fastvulkan.dll" "%FASTCORE_DIR%\fastvulkan.dll" >nul
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Unblock-File '%FASTCORE_DIR%\fastvulkan.dll'" >nul
 
-echo Running Image Zoom Demo...
+echo Running Compare Demo...
 cd examples\Demo
-call mvn compile exec:java -Dexec.mainClass="fastvulkan.DemoImageZoom" -q
+call mvn compile exec:java -Dexec.mainClass="fastvulkan.DemoGraphics2DCompare" -q
 if %ERRORLEVEL% NEQ 0 (
     echo Demo failed.
     pause
-    exit /b %ERRORLEVEL%
+    exit /b 1
 )
 
 cd ..\..

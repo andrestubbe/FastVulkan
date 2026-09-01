@@ -69,7 +69,16 @@ public class DemoImageZoom {
             };
             startNextTween.run();
 
-            long lastFpsTime = System.currentTimeMillis();
+            // Set native round window icon
+            java.awt.image.BufferedImage icon = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D gIcon = icon.createGraphics();
+            gIcon.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            gIcon.setColor(java.awt.Color.WHITE);
+            gIcon.fillOval(4, 4, 56, 56);
+            gIcon.dispose();
+            window.setIconImage(icon);
+
+            long lastFpsTime = System.nanoTime();
             int frames = 0;
 
             while (window.pollEvents()) {

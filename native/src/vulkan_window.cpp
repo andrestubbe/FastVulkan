@@ -203,6 +203,52 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         }
         break;
 
+    case WM_KEYDOWN:
+        if (ctx && wParam < 256) {
+            if (!ctx->keys[wParam]) {
+                ctx->keysJustPressed[wParam] = true;
+            }
+            ctx->keys[wParam] = true;
+        }
+        return 0;
+
+    case WM_KEYUP:
+        if (ctx && wParam < 256) {
+            ctx->keys[wParam] = false;
+        }
+        return 0;
+
+    case WM_MOUSEMOVE:
+        if (ctx) {
+            ctx->mouseX = LOWORD(lParam);
+            ctx->mouseY = HIWORD(lParam);
+        }
+        return 0;
+
+    case WM_LBUTTONDOWN:
+        if (ctx) ctx->mouseButtons[0] = true;
+        return 0;
+
+    case WM_LBUTTONUP:
+        if (ctx) ctx->mouseButtons[0] = false;
+        return 0;
+
+    case WM_RBUTTONDOWN:
+        if (ctx) ctx->mouseButtons[1] = true;
+        return 0;
+
+    case WM_RBUTTONUP:
+        if (ctx) ctx->mouseButtons[1] = false;
+        return 0;
+
+    case WM_MBUTTONDOWN:
+        if (ctx) ctx->mouseButtons[2] = true;
+        return 0;
+
+    case WM_MBUTTONUP:
+        if (ctx) ctx->mouseButtons[2] = false;
+        return 0;
+
     case WM_CLOSE:
         if (ctx) ctx->shouldClose = true;
         DestroyWindow(hwnd);
@@ -462,6 +508,10 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
     // 9. Initialize 2D Shader Pipeline & Dynamic Vertex Buffers
     Init2DPipeline(ctx);
 
+    // 10. Create 1x1 white texture for solid-color shape drawing
+    uint32_t whitePixel = 0xFFFFFFFF; // BGRA: full white, full alpha
+    ctx->whiteTexture = CreateTexture(ctx, &whitePixel, 1, 1, false);
+
     return ctx;
 }
 
@@ -470,6 +520,12 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
 
     if (ctx->device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(ctx->device);
+
+        // Destroy white texture
+        if (ctx->whiteTexture) {
+            DestroyTexture(ctx, ctx->whiteTexture);
+            ctx->whiteTexture = nullptr;
+        }
 
         if (ctx->graphicsPipeline) { vkDestroyPipeline(ctx->device, ctx->graphicsPipeline, nullptr); ctx->graphicsPipeline = VK_NULL_HANDLE; }
         if (ctx->pipelineLayout) { vkDestroyPipelineLayout(ctx->device, ctx->pipelineLayout, nullptr); ctx->pipelineLayout = VK_NULL_HANDLE; }
@@ -526,6 +582,9 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
 bool PollWindowEvents(VulkanWindowContext* ctx) {
     if (!ctx || !ctx->hwnd) return false;
 
+    // Reset single-frame keypress states
+    memset(ctx->keysJustPressed, 0, sizeof(ctx->keysJustPressed));
+
     MSG msg;
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT) {
@@ -536,6 +595,31 @@ bool PollWindowEvents(VulkanWindowContext* ctx) {
     }
 
     return !ctx->shouldClose;
+}
+
+bool IsKeyDown(VulkanWindowContext* ctx, int keyCode) {
+    if (!ctx || keyCode < 0 || keyCode >= 256) return false;
+    return ctx->keys[keyCode];
+}
+
+bool IsKeyJustPressed(VulkanWindowContext* ctx, int keyCode) {
+    if (!ctx || keyCode < 0 || keyCode >= 256) return false;
+    return ctx->keysJustPressed[keyCode];
+}
+
+int GetMouseX(VulkanWindowContext* ctx) {
+    if (!ctx) return 0;
+    return ctx->mouseX;
+}
+
+int GetMouseY(VulkanWindowContext* ctx) {
+    if (!ctx) return 0;
+    return ctx->mouseY;
+}
+
+bool IsMouseButtonDown(VulkanWindowContext* ctx, int button) {
+    if (!ctx || button < 0 || button >= 5) return false;
+    return ctx->mouseButtons[button];
 }
 
 void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a) {
@@ -881,4 +965,11 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
     }
 
     ctx->currentFrame = (ctx->currentFrame + 1) % ctx->MAX_FRAMES_IN_FLIGHT;
+}
+
+// Draw a solid-color filled rectangle using pure vertex colors (u=-1 signals no-texture mode in shader)
+void DrawColoredRect(VulkanWindowContext* ctx, float x, float y, float w, float h, float r, float g, float b, float a) {
+    if (!ctx || w <= 0.0f || h <= 0.0f) return;
+    // u=-1 tells the fragment shader to use fragColor directly (no texture sample)
+    DrawImage(ctx, ctx->whiteTexture, x, y, w, h, -1.0f, 0.0f, -1.0f, 1.0f, r, g, b, a);
 }
