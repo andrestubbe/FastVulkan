@@ -213,7 +213,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         return 0;
     }
 
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
 VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int height, float clearR, float clearG, float clearB, float clearA) {
@@ -524,12 +524,12 @@ bool PollWindowEvents(VulkanWindowContext* ctx) {
     if (!ctx || !ctx->hwnd) return false;
 
     MSG msg;
-    while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT) {
             ctx->shouldClose = true;
         }
         TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        DispatchMessageW(&msg);
     }
 
     return !ctx->shouldClose;
