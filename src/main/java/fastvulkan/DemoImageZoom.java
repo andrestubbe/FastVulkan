@@ -101,9 +101,9 @@ public class DemoImageZoom {
                 window.present();
 
                 frames++;
-                long now = System.currentTimeMillis();
-                if (now - lastFpsTime >= 1000) {
-                    window.setTitle("FastVulkan FPS:" + frames);
+                long now = System.nanoTime();
+                if (now - lastFpsTime >= 1_000_000_000L) {
+                    window.setTitle("FastVulkan FPS: " + frames);
                     frames = 0;
                     lastFpsTime = now;
                 }

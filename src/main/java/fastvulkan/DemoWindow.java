@@ -26,19 +26,16 @@ public class DemoWindow {
             // Set background to noticeable Red
             window.setClearColor(0.88f, 0.12f, 0.12f, 1.0f);
 
-            long lastFpsTime = System.currentTimeMillis();
+            long lastFpsTime = System.nanoTime();
             int frames = 0;
 
             while (window.pollEvents()) {
-                // Lock render pacing directly to physical monitor VSync with zero GC
-                FastDWM.waitForVSync();
-
                 window.present();
 
                 frames++;
-                long now = System.currentTimeMillis();
-                if (now - lastFpsTime >= 1000) {
-                    window.setTitle("FastVulkan FPS:" + frames);
+                long now = System.nanoTime();
+                if (now - lastFpsTime >= 1_000_000_000L) {
+                    window.setTitle("FastVulkan FPS: " + frames);
                     frames = 0;
                     lastFpsTime = now;
                 }
