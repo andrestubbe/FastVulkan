@@ -101,6 +101,8 @@ if %ERRORLEVEL% == 0 (
     echo.
     echo [SUCCESS] DLL built at: release\%LIB_NAME%.dll
     copy release\%LIB_NAME%.dll . >nul 2>&1
+    if not exist "src\main\resources\native" mkdir "src\main\resources\native"
+    copy release\%LIB_NAME%.dll src\main\resources\native\%LIB_NAME%.dll >nul 2>&1
     if exist sign-natives.bat call sign-natives.bat
 ) else (
     echo.
