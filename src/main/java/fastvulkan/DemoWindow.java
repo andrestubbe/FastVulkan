@@ -21,7 +21,7 @@ public class DemoWindow {
             FastTheme.setWindowTransparency(consoleHwnd, 0);
         }
 
-        try (FastVulkanWindow window = new FastVulkanWindow("X", 1024, 600)) {
+        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan - Zero-Jitter Live Resize", 1024, 600)) {
             // Set native round window icon from FastAnimation demo
             window.setIconImage(createRoundIcon());
 
@@ -47,7 +47,7 @@ public class DemoWindow {
                 frames++;
                 long now = System.nanoTime();
                 if (now - lastFpsTime >= 1_000_000_000L) {
-                    window.setTitle("X - FPS: " + frames);
+                    window.setTitle("FastVulkan FPS: " + frames);
                     frames = 0;
                     lastFpsTime = now;
                 }
