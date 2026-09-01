@@ -61,6 +61,16 @@ struct VulkanWindowContext {
     VulkanTexture* currentTexture = nullptr;
     std::vector<Vertex2D> queuedVertices;
 
+    // Constraints & State
+    int minWidth = 0;
+    int minHeight = 0;
+    int maxWidth = 0;
+    int maxHeight = 0;
+    bool isFullscreen = false;
+    RECT savedWindowRect = { 0, 0, 0, 0 };
+    DWORD savedStyle = 0;
+    DWORD savedExStyle = 0;
+
     // Clear Color (Default: Red as requested)
     float clearR = 0.85f;
     float clearG = 0.15f;
@@ -76,6 +86,24 @@ void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a)
 void SetWindowTitle(VulkanWindowContext* ctx, const wchar_t* title);
 int GetWindowWidth(VulkanWindowContext* ctx);
 int GetWindowHeight(VulkanWindowContext* ctx);
+
+// Window Management & Geometry Methods
+void SetWindowLocation(VulkanWindowContext* ctx, int x, int y);
+int GetWindowX(VulkanWindowContext* ctx);
+int GetWindowY(VulkanWindowContext* ctx);
+void SetWindowDimensions(VulkanWindowContext* ctx, int width, int height);
+void SetWindowBounds(VulkanWindowContext* ctx, int x, int y, int width, int height);
+void CenterWindowOnScreen(VulkanWindowContext* ctx);
+void SetWindowVisible(VulkanWindowContext* ctx, bool visible);
+void SetWindowResizable(VulkanWindowContext* ctx, bool resizable);
+void SetWindowAlwaysOnTop(VulkanWindowContext* ctx, bool alwaysOnTop);
+void SetWindowFullscreen(VulkanWindowContext* ctx, bool fullscreen);
+bool IsWindowFullscreen(VulkanWindowContext* ctx);
+void MinimizeWindow(VulkanWindowContext* ctx);
+void MaximizeWindow(VulkanWindowContext* ctx);
+void RestoreWindow(VulkanWindowContext* ctx);
+void SetWindowMinSize(VulkanWindowContext* ctx, int minW, int minH);
+void SetWindowMaxSize(VulkanWindowContext* ctx, int maxW, int maxH);
 
 VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels, uint32_t width, uint32_t height, bool generateMipmaps = true);
 void DestroyTexture(VulkanWindowContext* ctx, VulkanTexture* tex);

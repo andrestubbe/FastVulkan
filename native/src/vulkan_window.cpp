@@ -162,6 +162,17 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         }
         return 0;
 
+    case WM_GETMINMAXINFO:
+        if (ctx) {
+            LPMINMAXINFO mmi = (LPMINMAXINFO)lParam;
+            if (ctx->minWidth > 0) mmi->ptMinTrackSize.x = ctx->minWidth;
+            if (ctx->minHeight > 0) mmi->ptMinTrackSize.y = ctx->minHeight;
+            if (ctx->maxWidth > 0) mmi->ptMaxTrackSize.x = ctx->maxWidth;
+            if (ctx->maxHeight > 0) mmi->ptMaxTrackSize.y = ctx->maxHeight;
+            return 0;
+        }
+        break;
+
     case WM_CLOSE:
         if (ctx) ctx->shouldClose = true;
         DestroyWindow(hwnd);
@@ -482,6 +493,146 @@ int GetWindowWidth(VulkanWindowContext* ctx) {
 int GetWindowHeight(VulkanWindowContext* ctx) {
     if (!ctx) return 0;
     return (int)ctx->swapChainExtent.height;
+}
+
+void SetWindowLocation(VulkanWindowContext* ctx, int x, int y) {
+    if (!ctx || !ctx->hwnd) return;
+    SetWindowPos(ctx->hwnd, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+int GetWindowX(VulkanWindowContext* ctx) {
+    if (!ctx || !ctx->hwnd) return 0;
+    RECT rc;
+    GetWindowRect(ctx->hwnd, &rc);
+    return rc.left;
+}
+
+int GetWindowY(VulkanWindowContext* ctx) {
+    if (!ctx || !ctx->hwnd) return 0;
+    RECT rc;
+    GetWindowRect(ctx->hwnd, &rc);
+    return rc.top;
+}
+
+void SetWindowDimensions(VulkanWindowContext* ctx, int width, int height) {
+    if (!ctx || !ctx->hwnd) return;
+    RECT wr = { 0, 0, width, height };
+    AdjustWindowRect(&wr, GetWindowLong(ctx->hwnd, GWL_STYLE), FALSE);
+    SetWindowPos(ctx->hwnd, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void SetWindowBounds(VulkanWindowContext* ctx, int x, int y, int width, int height) {
+    if (!ctx || !ctx->hwnd) return;
+    RECT wr = { 0, 0, width, height };
+    AdjustWindowRect(&wr, GetWindowLong(ctx->hwnd, GWL_STYLE), FALSE);
+    SetWindowPos(ctx->hwnd, nullptr, x, y, wr.right - wr.left, wr.bottom - wr.top, SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void CenterWindowOnScreen(VulkanWindowContext* ctx) {
+    if (!ctx || !ctx->hwnd) return;
+    RECT rc;
+    GetWindowRect(ctx->hwnd, &rc);
+    int winW = rc.right - rc.left;
+    int winH = rc.bottom - rc.top;
+
+    HMONITOR hMon = MonitorFromWindow(ctx->hwnd, MONITOR_DEFAULTTOPRIMARY);
+    MONITORINFO mi = { sizeof(mi) };
+    if (GetMonitorInfo(hMon, &mi)) {
+        int monW = mi.rcWork.right - mi.rcWork.left;
+        int monH = mi.rcWork.bottom - mi.rcWork.top;
+        int posX = mi.rcWork.left + (monW - winW) / 2;
+        int posY = mi.rcWork.top + (monH - winH) / 2;
+        SetWindowPos(ctx->hwnd, nullptr, posX, posY, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+void SetWindowVisible(VulkanWindowContext* ctx, bool visible) {
+    if (!ctx || !ctx->hwnd) return;
+    ShowWindow(ctx->hwnd, visible ? SW_SHOW : SW_HIDE);
+    if (visible) UpdateWindow(ctx->hwnd);
+}
+
+void SetWindowResizable(VulkanWindowContext* ctx, bool resizable) {
+    if (!ctx || !ctx->hwnd) return;
+    LONG_PTR style = GetWindowLongPtr(ctx->hwnd, GWL_STYLE);
+    if (resizable) {
+        style |= (WS_THICKFRAME | WS_MAXIMIZEBOX);
+    } else {
+        style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+    }
+    SetWindowLongPtr(ctx->hwnd, GWL_STYLE, style);
+    SetWindowPos(ctx->hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+}
+
+void SetWindowAlwaysOnTop(VulkanWindowContext* ctx, bool alwaysOnTop) {
+    if (!ctx || !ctx->hwnd) return;
+    SetWindowPos(ctx->hwnd, alwaysOnTop ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
+void SetWindowFullscreen(VulkanWindowContext* ctx, bool fullscreen) {
+    if (!ctx || !ctx->hwnd || ctx->isFullscreen == fullscreen) return;
+
+    if (fullscreen) {
+        // Save current window geometry and style
+        GetWindowRect(ctx->hwnd, &ctx->savedWindowRect);
+        ctx->savedStyle = (DWORD)GetWindowLong(ctx->hwnd, GWL_STYLE);
+        ctx->savedExStyle = (DWORD)GetWindowLong(ctx->hwnd, GWL_EXSTYLE);
+
+        HMONITOR hMon = MonitorFromWindow(ctx->hwnd, MONITOR_DEFAULTTOPRIMARY);
+        MONITORINFO mi = { sizeof(mi) };
+        if (GetMonitorInfo(hMon, &mi)) {
+            SetWindowLong(ctx->hwnd, GWL_STYLE, ctx->savedStyle & ~(WS_CAPTION | WS_THICKFRAME));
+            SetWindowLong(ctx->hwnd, GWL_EXSTYLE, ctx->savedExStyle & ~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE | WS_EX_STATICEDGE));
+            SetWindowPos(ctx->hwnd, HWND_TOP,
+                         mi.rcMonitor.left, mi.rcMonitor.top,
+                         mi.rcMonitor.right - mi.rcMonitor.left,
+                         mi.rcMonitor.bottom - mi.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            ctx->isFullscreen = true;
+        }
+    } else {
+        // Restore windowed style and geometry
+        SetWindowLong(ctx->hwnd, GWL_STYLE, ctx->savedStyle);
+        SetWindowLong(ctx->hwnd, GWL_EXSTYLE, ctx->savedExStyle);
+        SetWindowPos(ctx->hwnd, HWND_NOTOPMOST,
+                     ctx->savedWindowRect.left, ctx->savedWindowRect.top,
+                     ctx->savedWindowRect.right - ctx->savedWindowRect.left,
+                     ctx->savedWindowRect.bottom - ctx->savedWindowRect.top,
+                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        ctx->isFullscreen = false;
+    }
+}
+
+bool IsWindowFullscreen(VulkanWindowContext* ctx) {
+    if (!ctx) return false;
+    return ctx->isFullscreen;
+}
+
+void MinimizeWindow(VulkanWindowContext* ctx) {
+    if (!ctx || !ctx->hwnd) return;
+    ShowWindow(ctx->hwnd, SW_MINIMIZE);
+}
+
+void MaximizeWindow(VulkanWindowContext* ctx) {
+    if (!ctx || !ctx->hwnd) return;
+    ShowWindow(ctx->hwnd, SW_MAXIMIZE);
+}
+
+void RestoreWindow(VulkanWindowContext* ctx) {
+    if (!ctx || !ctx->hwnd) return;
+    ShowWindow(ctx->hwnd, SW_RESTORE);
+}
+
+void SetWindowMinSize(VulkanWindowContext* ctx, int minW, int minH) {
+    if (!ctx) return;
+    ctx->minWidth = minW;
+    ctx->minHeight = minH;
+}
+
+void SetWindowMaxSize(VulkanWindowContext* ctx, int maxW, int maxH) {
+    if (!ctx) return;
+    ctx->maxWidth = maxW;
+    ctx->maxHeight = maxH;
 }
 
 void RenderAndPresent(VulkanWindowContext* ctx) {

@@ -82,6 +82,89 @@ JNIEXPORT jint JNICALL Java_fastvulkan_FastVulkanWindow_nGetHeight(
     return (jint)GetWindowHeight((VulkanWindowContext*)handle);
 }
 
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetLocation(
+    JNIEnv* env, jclass clazz, jlong handle, jint x, jint y) {
+    if (handle) SetWindowLocation((VulkanWindowContext*)handle, x, y);
+}
+
+JNIEXPORT jint JNICALL Java_fastvulkan_FastVulkanWindow_nGetX(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (!handle) return 0;
+    return GetWindowX((VulkanWindowContext*)handle);
+}
+
+JNIEXPORT jint JNICALL Java_fastvulkan_FastVulkanWindow_nGetY(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (!handle) return 0;
+    return GetWindowY((VulkanWindowContext*)handle);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetDimensions(
+    JNIEnv* env, jclass clazz, jlong handle, jint width, jint height) {
+    if (handle) SetWindowDimensions((VulkanWindowContext*)handle, width, height);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetBounds(
+    JNIEnv* env, jclass clazz, jlong handle, jint x, jint y, jint width, jint height) {
+    if (handle) SetWindowBounds((VulkanWindowContext*)handle, x, y, width, height);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nCenterOnScreen(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle) CenterWindowOnScreen((VulkanWindowContext*)handle);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetVisible(
+    JNIEnv* env, jclass clazz, jlong handle, jboolean visible) {
+    if (handle) SetWindowVisible((VulkanWindowContext*)handle, visible == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetResizable(
+    JNIEnv* env, jclass clazz, jlong handle, jboolean resizable) {
+    if (handle) SetWindowResizable((VulkanWindowContext*)handle, resizable == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetAlwaysOnTop(
+    JNIEnv* env, jclass clazz, jlong handle, jboolean alwaysOnTop) {
+    if (handle) SetWindowAlwaysOnTop((VulkanWindowContext*)handle, alwaysOnTop == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetFullscreen(
+    JNIEnv* env, jclass clazz, jlong handle, jboolean fullscreen) {
+    if (handle) SetWindowFullscreen((VulkanWindowContext*)handle, fullscreen == JNI_TRUE);
+}
+
+JNIEXPORT jboolean JNICALL Java_fastvulkan_FastVulkanWindow_nIsFullscreen(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (!handle) return JNI_FALSE;
+    return IsWindowFullscreen((VulkanWindowContext*)handle) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nMinimize(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle) MinimizeWindow((VulkanWindowContext*)handle);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nMaximize(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle) MaximizeWindow((VulkanWindowContext*)handle);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nRestore(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle) RestoreWindow((VulkanWindowContext*)handle);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetMinSize(
+    JNIEnv* env, jclass clazz, jlong handle, jint minW, jint minH) {
+    if (handle) SetWindowMinSize((VulkanWindowContext*)handle, minW, minH);
+}
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetMaxSize(
+    JNIEnv* env, jclass clazz, jlong handle, jint maxW, jint maxH) {
+    if (handle) SetWindowMaxSize((VulkanWindowContext*)handle, maxW, maxH);
+}
+
 JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateTexture(
     JNIEnv* env, jclass clazz, jlong handle, jintArray pixels, jint width, jint height, jboolean mipmaps) {
     if (!handle || !pixels || width <= 0 || height <= 0) return 0;
