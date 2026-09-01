@@ -51,9 +51,14 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetTitle(
     if (handle && title) {
         const char* utf = env->GetStringUTFChars(title, nullptr);
         if (utf) {
-            auto ctx = (VulkanWindowContext*)handle;
-            if (ctx && ctx->hwnd) {
-                SetWindowTextA(ctx->hwnd, utf);
+            int len = MultiByteToWideChar(CP_UTF8, 0, utf, -1, nullptr, 0);
+            if (len > 0) {
+                std::vector<wchar_t> wbuf(len + 1, 0);
+                MultiByteToWideChar(CP_UTF8, 0, utf, -1, wbuf.data(), len);
+                auto ctx = (VulkanWindowContext*)handle;
+                if (ctx && ctx->hwnd) {
+                    SetWindowTextW(ctx->hwnd, wbuf.data());
+                }
             }
             env->ReleaseStringUTFChars(title, utf);
         }
