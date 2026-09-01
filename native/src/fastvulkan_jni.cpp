@@ -161,6 +161,17 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetMaxSize(
     if (handle) SetWindowMaxSize((VulkanWindowContext*)handle, maxW, maxH);
 }
 
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetIcon(
+    JNIEnv* env, jclass clazz, jlong handle, jintArray pixels, jint width, jint height) {
+    if (handle && pixels && width > 0 && height > 0) {
+        jint* rawPixels = env->GetIntArrayElements(pixels, nullptr);
+        if (rawPixels) {
+            SetWindowIcon((VulkanWindowContext*)handle, (const uint32_t*)rawPixels, width, height);
+            env->ReleaseIntArrayElements(pixels, rawPixels, JNI_ABORT);
+        }
+    }
+}
+
 JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateTexture(
     JNIEnv* env, jclass clazz, jlong handle, jintArray pixels, jint width, jint height, jboolean mipmaps) {
     if (!handle || !pixels || width <= 0 || height <= 0) return 0;

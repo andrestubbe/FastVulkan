@@ -186,6 +186,16 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    public void setIconImage(java.awt.image.BufferedImage image) {
+        if (nativeHandle != 0 && image != null) {
+            int w = image.getWidth();
+            int h = image.getHeight();
+            int[] pixels = new int[w * h];
+            image.getRGB(0, 0, w, h, pixels, 0, w);
+            nSetIcon(nativeHandle, pixels, w, h);
+        }
+    }
+
     @Override
     public void close() {
         if (nativeHandle != 0) {
@@ -220,6 +230,7 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nRestore(long handle);
     private static native void nSetMinSize(long handle, int minW, int minH);
     private static native void nSetMaxSize(long handle, int maxW, int maxH);
+    private static native void nSetIcon(long handle, int[] pixels, int width, int height);
     private static native long nCreateTexture(long handle, int[] pixels, int width, int height, boolean mipmaps);
     private static native void nDestroyTexture(long handle, long texHandle);
     private static native void nDrawImage(long handle, long texHandle, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);

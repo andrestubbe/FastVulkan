@@ -116,6 +116,7 @@ void MaximizeWindow(VulkanWindowContext* ctx);
 void RestoreWindow(VulkanWindowContext* ctx);
 void SetWindowMinSize(VulkanWindowContext* ctx, int minW, int minH);
 void SetWindowMaxSize(VulkanWindowContext* ctx, int maxW, int maxH);
+void SetWindowIcon(VulkanWindowContext* ctx, const uint32_t* pixels, int width, int height);
 
 // Texture / drawing
 VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels,

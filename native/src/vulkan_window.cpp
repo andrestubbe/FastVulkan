@@ -696,6 +696,46 @@ void SetWindowMaxSize(VulkanWindowContext* ctx, int maxW, int maxH) {
     ctx->maxHeight = maxH;
 }
 
+void SetWindowIcon(VulkanWindowContext* ctx, const uint32_t* pixels, int width, int height) {
+    if (!ctx || !ctx->hwnd || !pixels || width <= 0 || height <= 0) return;
+
+    BITMAPV5HEADER bi{};
+    bi.bV5Size = sizeof(BITMAPV5HEADER);
+    bi.bV5Width = width;
+    bi.bV5Height = -height; // Top-down
+    bi.bV5Planes = 1;
+    bi.bV5BitCount = 32;
+    bi.bV5Compression = BI_BITFIELDS;
+    bi.bV5RedMask   = 0x00FF0000;
+    bi.bV5GreenMask = 0x0000FF00;
+    bi.bV5BlueMask  = 0x000000FF;
+    bi.bV5AlphaMask = 0xFF000000;
+
+    HDC hdc = GetDC(ctx->hwnd);
+    void* lpBits = nullptr;
+    HBITMAP hBitmap = CreateDIBSection(hdc, (BITMAPINFO*)&bi, DIB_RGB_COLORS, &lpBits, nullptr, 0);
+    HBITMAP hMonoMask = CreateBitmap(width, height, 1, 1, nullptr);
+    ReleaseDC(ctx->hwnd, hdc);
+
+    if (hBitmap && lpBits) {
+        memcpy(lpBits, pixels, (size_t)width * height * 4);
+
+        ICONINFO ii{};
+        ii.fIcon = TRUE;
+        ii.hbmMask = hMonoMask;
+        ii.hbmColor = hBitmap;
+
+        HICON hIcon = CreateIconIndirect(&ii);
+        if (hIcon) {
+            SendMessageW(ctx->hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+            SendMessageW(ctx->hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+        }
+
+        DeleteObject(hBitmap);
+        DeleteObject(hMonoMask);
+    }
+}
+
 void RenderAndPresent(VulkanWindowContext* ctx) {
     if (!ctx || ctx->device == VK_NULL_HANDLE || ctx->swapChain == VK_NULL_HANDLE) return;
 
