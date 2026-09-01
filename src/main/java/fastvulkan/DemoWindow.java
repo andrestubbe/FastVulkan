@@ -21,12 +21,19 @@ public class DemoWindow {
             FastTheme.setWindowTransparency(consoleHwnd, 0);
         }
 
-        try (FastVulkanWindow window = new FastVulkanWindow("ABCDEFGHIJKLMN", 1024, 600)) {
+        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan - Zero-Jitter Live Resize", 1024, 600)) {
             // Set native round window icon from FastAnimation demo
             window.setIconImage(createRoundIcon());
 
             long hwnd = window.getHWND();
-            // Test title without FastTheme interference
+            if (hwnd != 0) {
+                // Apply Dark Mode and Black Titlebar styling via FastTheme
+                FastTheme.setTitleBarDarkMode(hwnd, true);
+                FastTheme.setTitleBarColor(hwnd, 20, 20, 20);
+                FastTheme.setTitleBarTextColor(hwnd, 240, 240, 240);
+                FastTheme.setWindowBackgroundColor(hwnd, 20, 20, 20);
+                FastTheme.setCornerStyle(hwnd, 2); // Windows 11 Rounded corners
+            }
 
             // Set background to noticeable Red
             window.setClearColor(0.88f, 0.12f, 0.12f, 1.0f);
@@ -40,7 +47,7 @@ public class DemoWindow {
                 frames++;
                 long now = System.nanoTime();
                 if (now - lastFpsTime >= 1_000_000_000L) {
-                    window.setTitle("ABCDEFGHIJKLMN - FPS: " + frames);
+                    window.setTitle("FastVulkan FPS: " + frames);
                     frames = 0;
                     lastFpsTime = now;
                 }
