@@ -216,16 +216,6 @@ VulkanWindowContext* CreateVulkanWindow(const wchar_t* title, int width, int hei
         return nullptr;
     }
 
-    // Standard Windows Dark Mode titlebar
-    BOOL darkMode = TRUE;
-    DwmSetWindowAttribute(ctx->hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &darkMode, sizeof(darkMode));
-    COLORREF captionColor = RGB(20, 20, 20);
-    DwmSetWindowAttribute(ctx->hwnd, 35 /* DWMWA_CAPTION_COLOR */, &captionColor, sizeof(captionColor));
-    COLORREF textColor = RGB(240, 240, 240);
-    DwmSetWindowAttribute(ctx->hwnd, 36 /* DWMWA_TEXT_COLOR */, &textColor, sizeof(textColor));
-    DWORD cornerStyle = 2; // Rounded
-    DwmSetWindowAttribute(ctx->hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &cornerStyle, sizeof(cornerStyle));
-
     SetWindowLongPtr(ctx->hwnd, GWLP_USERDATA, (LONG_PTR)ctx);
 
     // 1. Create Vulkan Instance
