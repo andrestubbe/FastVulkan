@@ -7,15 +7,15 @@ JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateWindow(
     JNIEnv* env, jclass clazz, jstring title, jint width, jint height, jfloat r, jfloat g, jfloat b, jfloat a) {
     
     if (!title) return 0;
-    const char* utf = env->GetStringUTFChars(title, nullptr);
-    if (!utf) return 0;
+    const jchar* chars = env->GetStringChars(title, nullptr);
+    jsize len = env->GetStringLength(title);
+    std::wstring wTitle;
+    if (chars && len > 0) {
+        wTitle.assign((const wchar_t*)chars, (size_t)len);
+        env->ReleaseStringChars(title, chars);
+    }
 
-    int len = MultiByteToWideChar(CP_UTF8, 0, utf, -1, nullptr, 0);
-    std::vector<wchar_t> wbuf(len + 1, 0);
-    MultiByteToWideChar(CP_UTF8, 0, utf, -1, wbuf.data(), len);
-    env->ReleaseStringUTFChars(title, utf);
-
-    VulkanWindowContext* ctx = CreateVulkanWindow(wbuf.data(), width, height, r, g, b, a);
+    VulkanWindowContext* ctx = CreateVulkanWindow(wTitle.c_str(), width, height, r, g, b, a);
     return (jlong)ctx;
 }
 
@@ -49,18 +49,15 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetClearColor(
 JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetTitle(
     JNIEnv* env, jclass clazz, jlong handle, jstring title) {
     if (handle && title) {
-        const char* utf = env->GetStringUTFChars(title, nullptr);
-        if (utf) {
-            int len = MultiByteToWideChar(CP_UTF8, 0, utf, -1, nullptr, 0);
-            if (len > 0) {
-                std::vector<wchar_t> wbuf(len + 1, 0);
-                MultiByteToWideChar(CP_UTF8, 0, utf, -1, wbuf.data(), len);
-                auto ctx = (VulkanWindowContext*)handle;
-                if (ctx && ctx->hwnd) {
-                    SetWindowTextW(ctx->hwnd, wbuf.data());
-                }
+        const jchar* chars = env->GetStringChars(title, nullptr);
+        jsize len = env->GetStringLength(title);
+        if (chars && len > 0) {
+            std::wstring wTitle((const wchar_t*)chars, (size_t)len);
+            env->ReleaseStringChars(title, chars);
+            auto ctx = (VulkanWindowContext*)handle;
+            if (ctx && ctx->hwnd) {
+                SetWindowTextW(ctx->hwnd, wTitle.c_str());
             }
-            env->ReleaseStringUTFChars(title, utf);
         }
     }
 }
