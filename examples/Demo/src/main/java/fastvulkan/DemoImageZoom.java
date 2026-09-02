@@ -17,12 +17,6 @@ public class DemoImageZoom {
     private static float currentZoom = 1.0f;
 
     public static void main(String[] args) throws Exception {
-        // Auto-hide console if started from batch
-        long consoleHwnd = FastTheme.getConsoleWindowHandle();
-        if (consoleHwnd != 0) {
-            FastTheme.setWindowTransparency(consoleHwnd, 0);
-        }
-
         // Capture Desktop Screenshot via Robot
         System.out.println("Capturing Desktop screenshot...");
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();

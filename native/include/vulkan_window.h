@@ -87,8 +87,14 @@ struct VulkanWindowContext {
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
     void* vertexBufferMapped = nullptr;
 
-    // Batching
+    // Multi-texture batching
+    struct DrawBatch {
+        VulkanTexture* texture;
+        uint32_t firstVertex;
+        uint32_t vertexCount;
+    };
     std::vector<Vertex2D> queuedVertices;
+    std::vector<DrawBatch> drawBatches;
     VulkanTexture* currentTexture = nullptr;
 
     // Features
@@ -146,3 +152,5 @@ void DrawImage(VulkanWindowContext* ctx, VulkanTexture* tex,
 void FlushBatch(VulkanWindowContext* ctx);
 void Init2DPipeline(VulkanWindowContext* ctx);
 void DrawColoredRect(VulkanWindowContext* ctx, float x, float y, float w, float h, float r, float g, float b, float a);
+void DrawColoredOval(VulkanWindowContext* ctx, float x, float y, float w, float h, float r, float g, float b, float a, bool antialias, bool outline, float strokeWidth);
+void DrawColoredRoundRect(VulkanWindowContext* ctx, float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, bool antialias, bool outline, float strokeWidth);

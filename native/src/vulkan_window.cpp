@@ -908,15 +908,24 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(cmd, 0, 1, &ctx->vertexBuffer, offsets);
 
-        // Bind cached Descriptor Set from texture directly (no per-frame allocations)
-        if (ctx->currentTexture && ctx->currentTexture->descriptorSet != VK_NULL_HANDLE) {
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    ctx->pipelineLayout, 0, 1,
-                                    &ctx->currentTexture->descriptorSet, 0, nullptr);
+        for (const auto& batch : ctx->drawBatches) {
+            if (batch.vertexCount == 0) continue;
+            if (batch.firstVertex >= count) break;
+            uint32_t drawCount = (std::min)(batch.vertexCount, (uint32_t)(count - batch.firstVertex));
+
+            // Bind batch texture descriptor set if present, otherwise fall back to whiteTexture
+            VulkanTexture* tex = batch.texture ? batch.texture : ctx->whiteTexture;
+            if (tex && tex->descriptorSet != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        ctx->pipelineLayout, 0, 1,
+                                        &tex->descriptorSet, 0, nullptr);
+            }
+
+            vkCmdDraw(cmd, drawCount, 1, batch.firstVertex, 0);
         }
 
-        vkCmdDraw(cmd, (uint32_t)count, 1, 0, 0);
         ctx->queuedVertices.clear();
+        ctx->drawBatches.clear();
     }
 
     vkCmdEndRenderPass(cmd);
@@ -967,9 +976,72 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
     ctx->currentFrame = (ctx->currentFrame + 1) % ctx->MAX_FRAMES_IN_FLIGHT;
 }
 
-// Draw a solid-color filled rectangle using pure vertex colors (u=-1 signals no-texture mode in shader)
+// Draw a solid-color filled rectangle using pure vertex colors (u=-100 signals solid rect in shader)
 void DrawColoredRect(VulkanWindowContext* ctx, float x, float y, float w, float h, float r, float g, float b, float a) {
     if (!ctx || w <= 0.0f || h <= 0.0f) return;
-    // u=-1 tells the fragment shader to use fragColor directly (no texture sample)
-    DrawImage(ctx, ctx->whiteTexture, x, y, w, h, -1.0f, 0.0f, -1.0f, 1.0f, r, g, b, a);
+    DrawImage(ctx, ctx->whiteTexture, x, y, w, h, -100.0f, 0.0f, -100.0f, 1.0f, r, g, b, a);
 }
+
+// Draw a filled or outlined oval / circle using analytical SDF shaders
+void DrawColoredOval(VulkanWindowContext* ctx, float x, float y, float w, float h, float r, float g, float b, float a, bool antialias, bool outline, float strokeWidth) {
+    if (!ctx || w <= 0.0f || h <= 0.0f) return;
+
+    if (outline) {
+        float drawX = x - 0.5f;
+        float drawY = y - 0.5f;
+        float drawW = w + 1.0f;
+        float drawH = h + 1.0f;
+
+        // Outline: -2.0 (with AA), -50.0 (without AA)
+        float centerU = antialias ? -2.0f : -50.0f;
+        float u0 = centerU - 1.0f;
+        float u1 = centerU + 1.0f;
+        float v0 = -1.0f;
+        float v1 = 1.0f;
+
+        DrawImage(ctx, ctx->whiteTexture, drawX, drawY, drawW, drawH, u0, v0, u1, v1, r, g, b, a);
+    } else {
+        // Fill: -30.0 (with AA), -60.0 (without AA)
+        float centerU = antialias ? -30.0f : -60.0f;
+        float u0 = centerU - 1.0f;
+        float u1 = centerU + 1.0f;
+        float v0 = -1.0f;
+        float v1 = 1.0f;
+
+        DrawImage(ctx, ctx->whiteTexture, x, y, w, h, u0, v0, u1, v1, r, g, b, a);
+    }
+}
+
+// Draw a filled or outlined rounded rectangle using analytical SDF shaders
+void DrawColoredRoundRect(VulkanWindowContext* ctx, float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, bool antialias, bool outline, float strokeWidth) {
+    if (!ctx || w <= 0.0f || h <= 0.0f) return;
+
+    if (outline) {
+        float drawX = x - 0.5f;
+        float drawY = y - 0.5f;
+        float drawW = w + 1.0f;
+        float drawH = h + 1.0f;
+
+        float centerU = -10.0f; // RoundRect Outline with AA
+        float u0 = centerU - 1.0f;
+        float u1 = centerU + 1.0f;
+        float v0 = -1.0f;
+        float v1 = 1.0f;
+
+        DrawImage(ctx, ctx->whiteTexture, drawX, drawY, drawW, drawH, u0, v0, u1, v1, r, g, b, a);
+    } else {
+        float centerU = -20.0f; // RoundRect Fill with AA
+        float u0 = centerU - 1.0f;
+        float u1 = centerU + 1.0f;
+        float v0 = -1.0f;
+        float v1 = 1.0f;
+
+        DrawImage(ctx, ctx->whiteTexture, x, y, w, h, u0, v0, u1, v1, r, g, b, a);
+    }
+}
+
+
+
+
+
+

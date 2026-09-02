@@ -15,12 +15,6 @@ public class DemoWindow {
     }
 
     public static void main(String[] args) {
-        // Automatically hide the terminal console window if started from .bat
-        long consoleHwnd = FastTheme.getConsoleWindowHandle();
-        if (consoleHwnd != 0) {
-            FastTheme.setWindowTransparency(consoleHwnd, 0);
-        }
-
         try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan - Zero-Jitter Live Resize", 1024, 600)) {
             // Set native round window icon from FastAnimation demo
             window.setIconImage(createRoundIcon());

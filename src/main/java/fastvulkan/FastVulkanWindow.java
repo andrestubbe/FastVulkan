@@ -270,5 +270,15 @@ public class FastVulkanWindow implements AutoCloseable {
         if (nativeHandle != 0) nDrawColoredRect(nativeHandle, x, y, w, h, r, g, b, a);
     }
 
+    public void drawColoredOval(float x, float y, float w, float h, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth) {
+        if (nativeHandle != 0) nDrawColoredOval(nativeHandle, x, y, w, h, r, g, b, a, antialias, outline, strokeWidth);
+    }
+
+    public void drawColoredRoundRect(float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth) {
+        if (nativeHandle != 0) nDrawColoredRoundRect(nativeHandle, x, y, w, h, rx, ry, r, g, b, a, antialias, outline, strokeWidth);
+    }
+
     private static native void nDrawColoredRect(long handle, float x, float y, float w, float h, float r, float g, float b, float a);
+    private static native void nDrawColoredOval(long handle, float x, float y, float w, float h, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
+    private static native void nDrawColoredRoundRect(long handle, float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
 }

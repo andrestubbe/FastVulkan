@@ -242,5 +242,27 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawColoredRect(
     }
 }
 
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawColoredOval(
+    JNIEnv* env, jclass clazz, jlong handle,
+    jfloat x, jfloat y, jfloat w, jfloat h,
+    jfloat r, jfloat g, jfloat b, jfloat a,
+    jboolean antialias, jboolean outline, jfloat strokeWidth) {
+    if (handle) {
+        DrawColoredOval((VulkanWindowContext*)handle, x, y, w, h, r, g, b, a, antialias == JNI_TRUE, outline == JNI_TRUE, strokeWidth);
+    }
 }
+
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawColoredRoundRect(
+    JNIEnv* env, jclass clazz, jlong handle,
+    jfloat x, jfloat y, jfloat w, jfloat h,
+    jfloat rx, jfloat ry,
+    jfloat r, jfloat g, jfloat b, jfloat a,
+    jboolean antialias, jboolean outline, jfloat strokeWidth) {
+    if (handle) {
+        DrawColoredRoundRect((VulkanWindowContext*)handle, x, y, w, h, rx, ry, r, g, b, a, antialias == JNI_TRUE, outline == JNI_TRUE, strokeWidth);
+    }
+}
+
+}
+
 

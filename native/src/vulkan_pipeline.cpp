@@ -19,24 +19,28 @@ static uint32_t FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFil
 }
 
 static std::vector<char> ReadShaderFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open()) {
-        std::string alt = "src/main/resources/shaders/" + filename;
-        file.open(alt, std::ios::ate | std::ios::binary);
+    std::vector<std::string> searchPaths = {
+        filename,
+        "src/main/resources/shaders/" + filename,
+        "native/src/" + filename,
+        "../../src/main/resources/shaders/" + filename,
+        "../../native/src/" + filename,
+        "../src/main/resources/shaders/" + filename,
+        "../native/src/" + filename
+    };
+
+    for (const auto& path : searchPaths) {
+        std::ifstream file(path, std::ios::ate | std::ios::binary);
+        if (file.is_open()) {
+            size_t fileSize = (size_t)file.tellg();
+            std::vector<char> buffer(fileSize);
+            file.seekg(0);
+            file.read(buffer.data(), fileSize);
+            file.close();
+            return buffer;
+        }
     }
-    if (!file.is_open()) {
-        std::string alt2 = "native/src/" + filename;
-        file.open(alt2, std::ios::ate | std::ios::binary);
-    }
-    if (!file.is_open()) {
-        return {};
-    }
-    size_t fileSize = (size_t)file.tellg();
-    std::vector<char> buffer(fileSize);
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-    return buffer;
+    return {};
 }
 
 static VkShaderModule CreateShaderModule(VkDevice device, const std::vector<char>& code) {
@@ -524,9 +528,9 @@ void DestroyTexture(VulkanWindowContext* ctx, VulkanTexture* tex) {
 void DrawImage(VulkanWindowContext* ctx, VulkanTexture* tex, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a) {
     if (!ctx || w <= 0.0f || h <= 0.0f) return;
 
-    if (ctx->currentTexture != tex) {
-        FlushBatch(ctx);
-        ctx->currentTexture = tex;
+    if (ctx->drawBatches.empty() || ctx->drawBatches.back().texture != tex) {
+        uint32_t first = (uint32_t)ctx->queuedVertices.size();
+        ctx->drawBatches.push_back({ tex, first, 0 });
     }
 
     Vertex2D v00 = { x,     y,     u0, v0, r, g, b, a };
@@ -541,11 +545,11 @@ void DrawImage(VulkanWindowContext* ctx, VulkanTexture* tex, float x, float y, f
     ctx->queuedVertices.push_back(v00);
     ctx->queuedVertices.push_back(v11);
     ctx->queuedVertices.push_back(v01);
+
+    ctx->drawBatches.back().vertexCount += 6;
 }
 
 void FlushBatch(VulkanWindowContext* ctx) {
-    if (!ctx || ctx->queuedVertices.empty()) return;
-
-    size_t count = (std::min)(ctx->queuedVertices.size(), ctx->MAX_VERTICES);
-    memcpy(ctx->vertexBufferMapped, ctx->queuedVertices.data(), sizeof(Vertex2D) * count);
+    // No-op here; batches are flushed and drawn in RenderAndPresent
 }
+

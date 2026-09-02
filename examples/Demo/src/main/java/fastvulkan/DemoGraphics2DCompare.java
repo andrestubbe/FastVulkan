@@ -4,7 +4,9 @@ import fastdwm.FastDWM;
 import fasttheme.FastTheme;
 
 import java.awt.*;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.Rectangle2D;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 
@@ -12,38 +14,161 @@ public class DemoGraphics2DCompare {
 
     private static boolean showJava2D = true;
 
-    private static void renderJava2DScene(Graphics2D g, int w, int h) {
-        g.setColor(new Color(20, 20, 20));
-        g.fillRect(0, 0, w, h);
-        g.setColor(new Color(220, 50, 50));
-        g.fill(new Rectangle2D.Float(200, 150, 200, 200));
+    // Homogeneous 100x100 Test Image
+    private static BufferedImage createTestImage(int size) {
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Nested circles
+        g.setColor(new Color(40, 140, 240));
+        g.fillOval(2, 2, size - 4, size - 4);
+        g.setColor(new Color(255, 200, 50));
+        g.fillOval(16, 16, size - 32, size - 32);
+        g.setColor(new Color(240, 60, 60));
+        g.fillOval(30, 30, size - 60, size - 60);
+
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        g.drawString("IMG", size / 2 - 14, size / 2 + 5);
+        g.dispose();
+        return img;
     }
 
-    private static void renderVulkanScene(FastVulkanGraphics g) {
+    private static void renderJava2DScene(Graphics2D g, int w, int h, BufferedImage testImg) {
+        g.setColor(new Color(20, 20, 20));
+        g.fillRect(0, 0, w, h);
+
+        final float S = 100.0f; // Homogeneous 100x100 size for all shapes
+        final float Y1 = 40.0f; // Row 1 (AA)
+        final float Y2 = 170.0f; // Row 2 (AA Outlines)
+        final float Y3 = 300.0f; // Row 3 (Non-AA)
+
+        // ═══════════════════════════════════════════════════════════
+        // Row 1: Filled Shapes with 16x Subpixel AA (100x100)
+        // ═══════════════════════════════════════════════════════════
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // 1. Rectangle
         g.setColor(new Color(220, 50, 50));
-        g.fill(new Rectangle2D.Float(200, 150, 200, 200));
+        g.fill(new Rectangle2D.Float(40, Y1, S, S));
+
+        // 2. RoundRectangle
+        g.setColor(new Color(50, 200, 120));
+        g.fill(new RoundRectangle2D.Float(170, Y1, S, S, 35, 35));
+
+        // 3. Circle
+        g.setColor(new Color(255, 170, 0));
+        g.fill(new Ellipse2D.Float(300, Y1, S, S));
+
+        // 4. Test Image
+        g.drawImage(testImg, 430, (int)Y1, null);
+
+        // ═══════════════════════════════════════════════════════════
+        // Row 2: Outlined Shapes with 16x Subpixel AA (100x100)
+        // ═══════════════════════════════════════════════════════════
+        g.setStroke(new BasicStroke(1.0f));
+
+        // 5. Rectangle Outline
+        g.setColor(new Color(220, 50, 50));
+        g.draw(new Rectangle2D.Float(40, Y2, S, S));
+
+        // 6. RoundRectangle Outline
+        g.setColor(new Color(50, 200, 120));
+        g.draw(new RoundRectangle2D.Float(170, Y2, S, S, 35, 35));
+
+        // 7. Circle Outline
+        g.setColor(new Color(180, 100, 255));
+        g.draw(new Ellipse2D.Float(300, Y2, S, S));
+
+        // ═══════════════════════════════════════════════════════════
+        // Row 3: Shapes WITHOUT AA (100x100)
+        // ═══════════════════════════════════════════════════════════
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+        // 8. Circle Fill (No AA)
+        g.setColor(new Color(255, 170, 0));
+        g.fill(new Ellipse2D.Float(40, Y3, S, S));
+
+        // 9. Circle Outline (No AA)
+        g.setColor(new Color(180, 100, 255));
+        g.draw(new Ellipse2D.Float(170, Y3, S, S));
+    }
+
+    private static void renderVulkanScene(FastVulkanGraphics g, BufferedImage testImg) {
+        final float S = 100.0f; // Homogeneous 100x100 size for all shapes
+        final float Y1 = 40.0f; // Row 1 (AA)
+        final float Y2 = 170.0f; // Row 2 (AA Outlines)
+        final float Y3 = 300.0f; // Row 3 (Non-AA)
+
+        // ═══════════════════════════════════════════════════════════
+        // Row 1: Filled Shapes with 16x Subpixel AA (100x100)
+        // ═══════════════════════════════════════════════════════════
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // 1. Rectangle
+        g.setColor(new Color(220, 50, 50));
+        g.fill(new Rectangle2D.Float(40, Y1, S, S));
+
+        // 2. RoundRectangle
+        g.setColor(new Color(50, 200, 120));
+        g.fill(new RoundRectangle2D.Float(170, Y1, S, S, 35, 35));
+
+        // 3. Circle
+        g.setColor(new Color(255, 170, 0));
+        g.fill(new Ellipse2D.Float(300, Y1, S, S));
+
+        // 4. Test Image
+        g.setColor(Color.WHITE);
+        g.drawImage(testImg, 430, Y1);
+
+        // ═══════════════════════════════════════════════════════════
+        // Row 2: Outlined Shapes with 16x Subpixel AA (100x100)
+        // ═══════════════════════════════════════════════════════════
+        g.setStrokeWidth(1.0f);
+
+        // 5. Rectangle Outline
+        g.setColor(new Color(220, 50, 50));
+        g.draw(new Rectangle2D.Float(40, Y2, S, S));
+
+        // 6. RoundRectangle Outline
+        g.setColor(new Color(50, 200, 120));
+        g.draw(new RoundRectangle2D.Float(170, Y2, S, S, 35, 35));
+
+        // 7. Circle Outline
+        g.setColor(new Color(180, 100, 255));
+        g.draw(new Ellipse2D.Float(300, Y2, S, S));
+
+        // ═══════════════════════════════════════════════════════════
+        // Row 3: Shapes WITHOUT AA (100x100)
+        // ═══════════════════════════════════════════════════════════
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+
+        // 8. Circle Fill (No AA)
+        g.setColor(new Color(255, 170, 0));
+        g.fill(new Ellipse2D.Float(40, Y3, S, S));
+
+        // 9. Circle Outline (No AA)
+        g.setColor(new Color(180, 100, 255));
+        g.draw(new Ellipse2D.Float(170, Y3, S, S));
     }
 
     public static void main(String[] args) throws Exception {
-        final int winW = 800;
-        final int winH = 500;
+        final int winW = 600;
+        final int winH = 440;
 
-        // Java2D offscreen
+        BufferedImage testImg = createTestImage(100);
+
+        // Java2D offscreen reference
         BufferedImage j2dImage = new BufferedImage(winW, winH, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = j2dImage.createGraphics();
-        renderJava2DScene(g2d, winW, winH);
+        renderJava2DScene(g2d, winW, winH, testImg);
         g2d.dispose();
-
-        // Verify Java2D rendered something
-        int centerPixel = j2dImage.getRGB(300, 250); // inside red square
-        int bgPixel     = j2dImage.getRGB(10,  10);  // background
-        System.out.printf("Java2D center pixel: 0x%08X (expect red ~0xFFDC3232)%n", centerPixel);
-        System.out.printf("Java2D bg pixel:     0x%08X (expect dark ~0xFF141414)%n", bgPixel);
 
         int[] j2dPixels = ((DataBufferInt) j2dImage.getRaster().getDataBuffer()).getData();
 
         try (FastVulkanWindow window = new FastVulkanWindow(
-                "FastVulkan vs Java2D — [SPACE] to flip", winW, winH,
+                "FastVulkan vs Java2D 1:1 Pixel Calibration", winW, winH,
                 0.0784f, 0.0784f, 0.0784f, 1.0f)) {
 
             long hwnd = window.getHWND();
@@ -55,8 +180,6 @@ public class DemoGraphics2DCompare {
             }
 
             long j2dTexture = window.createTexture(j2dPixels, winW, winH, false);
-            System.out.println("Texture handle: " + j2dTexture);
-
             FastVulkanGraphics vkg = new FastVulkanGraphics(window);
 
             long lastFpsTime = System.nanoTime();
@@ -67,13 +190,17 @@ public class DemoGraphics2DCompare {
 
                 if (window.isKeyJustPressed(0x20)) {
                     showJava2D = !showJava2D;
-                    System.out.println("Mode: " + (showJava2D ? "Java2D" : "Vulkan"));
                 }
+
+                int curW = window.getWidth();
+                int curH = window.getHeight();
+                if (curW <= 0) curW = winW;
+                if (curH <= 0) curH = winH;
 
                 if (showJava2D) {
                     window.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
                 } else {
-                    renderVulkanScene(vkg);
+                    renderVulkanScene(vkg, testImg);
                 }
 
                 window.present();
@@ -81,7 +208,7 @@ public class DemoGraphics2DCompare {
                 frames++;
                 long now = System.nanoTime();
                 if (now - lastFpsTime >= 1_000_000_000L) {
-                    String mode = showJava2D ? "JAVA2D" : "VULKAN";
+                    String mode = showJava2D ? "JAVA2D Reference" : "FASTVULKAN Native (16x Subpixel SDF)";
                     window.setTitle("[" + mode + "] FPS: " + frames + "  [SPACE] flip");
                     frames = 0;
                     lastFpsTime = now;
