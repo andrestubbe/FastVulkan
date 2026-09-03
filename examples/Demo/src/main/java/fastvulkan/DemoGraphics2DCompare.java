@@ -82,7 +82,7 @@ public class DemoGraphics2DCompare {
         g.draw(new Ellipse2D.Float(300, Y2, S, S));
 
         // ═══════════════════════════════════════════════════════════
-        // Row 3: Shapes WITHOUT AA (100x100)
+        // Row 3: Shapes WITHOUT AA (100x100) + Typography Comparison
         // ═══════════════════════════════════════════════════════════
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
@@ -93,6 +93,16 @@ public class DemoGraphics2DCompare {
         // 9. Circle Outline (No AA)
         g.setColor(new Color(180, 100, 255));
         g.draw(new Ellipse2D.Float(170, Y3, S, S));
+
+        // 10. Typography Comparison (DirectWrite / Subpixel ClearType vs Java2D)
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        g.drawString("FastJava Typography 1:1", 300, Y3 + 30);
+        g.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        g.setColor(new Color(180, 180, 180));
+        g.drawString("Subpixel Anti-Aliasing (RGB ClearType)", 300, Y3 + 55);
+        g.drawString("100% Hardware Accelerated Glyph Pipeline", 300, Y3 + 75);
     }
 
     private static void renderVulkanScene(FastVulkanGraphics g, BufferedImage testImg) {
@@ -140,7 +150,7 @@ public class DemoGraphics2DCompare {
         g.draw(new Ellipse2D.Float(300, Y2, S, S));
 
         // ═══════════════════════════════════════════════════════════
-        // Row 3: Shapes WITHOUT AA (100x100)
+        // Row 3: Shapes WITHOUT AA (100x100) + Typography Comparison
         // ═══════════════════════════════════════════════════════════
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
@@ -151,6 +161,15 @@ public class DemoGraphics2DCompare {
         // 9. Circle Outline (No AA)
         g.setColor(new Color(180, 100, 255));
         g.draw(new Ellipse2D.Float(170, Y3, S, S));
+
+        // 10. Typography Comparison (Vulkan Native Cached Glyph Pipeline)
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        g.drawString("FastJava Typography 1:1", 300, Y3 + 30);
+        g.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        g.setColor(new Color(180, 180, 180));
+        g.drawString("Subpixel Anti-Aliasing (RGB ClearType)", 300, Y3 + 55);
+        g.drawString("100% Hardware Accelerated Glyph Pipeline", 300, Y3 + 75);
     }
 
     public static void main(String[] args) throws Exception {

@@ -44,21 +44,14 @@ float calculateRoundRectCoverage(vec2 p, vec2 dPdx, vec2 dPdy, vec2 b, float r) 
     return cov;
 }
 
-float calculateRoundRectStrokeCoverage(vec2 p, vec2 dPdx, vec2 dPdy, vec2 b, float r, float halfStroke) {
-    float cov = 0.0;
-    for (int j = 0; j < 4; j++) {
-        float sy = (float(j) + 0.5) * 0.25 - 0.5;
-        for (int i = 0; i < 4; i++) {
-            float sx = (float(i) + 0.5) * 0.25 - 0.5;
-            vec2 subP = p + sx * dPdx + sy * dPdy;
-            float dist = abs(sdRoundRect(subP, b, r));
-            if (dist <= halfStroke) {
-                cov += 0.0625;
-            }
-        }
-    }
-    return cov;
+float calculateRoundRectStrokeCoverage(vec2 p, vec2 dPdx, vec2 dPdy, vec2 b, float r, float strokePx) {
+    float covOuter = calculateRoundRectCoverage(p, dPdx, dPdy, b, r);
+    vec2 bInner = b - vec2(strokePx);
+    float rInner = max(0.0, r - strokePx);
+    float covInner = calculateRoundRectCoverage(p, dPdx, dPdy, bInner, rInner);
+    return clamp(covOuter - covInner, 0.0, 1.0);
 }
+
 
 float calculateStrokeCoverage(vec2 p, vec2 dPdx, vec2 dPdy, float targetR, float halfStroke) {
     float cov = 0.0;
@@ -133,8 +126,9 @@ void main() {
         vec2 dPdx = dFdx(p);
         vec2 dPdy = dFdy(p);
         float pxSize = max(length(dPdx), length(dPdy));
-        float halfStroke = 0.5 * pxSize;
-        float alpha = calculateRoundRectStrokeCoverage(p, dPdx, dPdy, vec2(1.0, 1.0), 0.35, halfStroke);
+        // Stroke width of 1 physical pixel in normalized coordinates = pxSize
+        // Calibrated corner radius: 0.368 matches Java2D arc center on expanded w+1 quad
+        float alpha = calculateRoundRectStrokeCoverage(p, dPdx, dPdy, vec2(1.0, 1.0), 0.368, pxSize);
         if (alpha <= 0.0) discard;
         outColor = vec4(fragColor.rgb, fragColor.a * alpha);
         return;

@@ -1017,18 +1017,14 @@ void DrawColoredRoundRect(VulkanWindowContext* ctx, float x, float y, float w, f
     if (!ctx || w <= 0.0f || h <= 0.0f) return;
 
     if (outline) {
-        float drawX = x - 0.5f;
-        float drawY = y - 0.5f;
-        float drawW = w + 1.0f;
-        float drawH = h + 1.0f;
-
+        // Java2D draw(Shape) spans from x to x+w, having a total span of w+1 and h+1 pixels
         float centerU = -10.0f; // RoundRect Outline with AA
         float u0 = centerU - 1.0f;
         float u1 = centerU + 1.0f;
         float v0 = -1.0f;
         float v1 = 1.0f;
 
-        DrawImage(ctx, ctx->whiteTexture, drawX, drawY, drawW, drawH, u0, v0, u1, v1, r, g, b, a);
+        DrawImage(ctx, ctx->whiteTexture, x, y, w + 1.0f, h + 1.0f, u0, v0, u1, v1, r, g, b, a);
     } else {
         float centerU = -20.0f; // RoundRect Fill with AA
         float u0 = centerU - 1.0f;

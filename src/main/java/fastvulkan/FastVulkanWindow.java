@@ -2,6 +2,8 @@ package fastvulkan;
 
 import fastcore.FastCore;
 
+import java.awt.image.BufferedImage;
+
 public class FastVulkanWindow implements AutoCloseable {
 
     static {
@@ -26,22 +28,6 @@ public class FastVulkanWindow implements AutoCloseable {
     public boolean pollEvents() {
         if (nativeHandle == 0) return false;
         return nPollEvents(nativeHandle);
-    }
-
-    public boolean isOpen() {
-        return nativeHandle != 0;
-    }
-
-    public void setClearColor(float r, float g, float b, float a) {
-        if (nativeHandle != 0) {
-            nSetClearColor(nativeHandle, r, g, b, a);
-        }
-    }
-
-    public void setTitle(String title) {
-        if (nativeHandle != 0) {
-            nSetTitle(nativeHandle, title);
-        }
     }
 
     public long createTexture(int[] pixels, int width, int height, boolean mipmaps) {
@@ -79,6 +65,30 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    public boolean isOpen() {
+        return nativeHandle != 0;
+    }
+
+    public boolean isFullscreen() {
+        if (nativeHandle == 0) return false;
+        return nIsFullscreen(nativeHandle);
+    }
+
+    public boolean isKeyDown(int keyCode) {
+        if (nativeHandle == 0) return false;
+        return nIsKeyDown(nativeHandle, keyCode);
+    }
+
+    public boolean isKeyJustPressed(int keyCode) {
+        if (nativeHandle == 0) return false;
+        return nIsKeyJustPressed(nativeHandle, keyCode);
+    }
+
+    public boolean isMouseButtonDown(int button) {
+        if (nativeHandle == 0) return false;
+        return nIsMouseButtonDown(nativeHandle, button);
+    }
+
     public long getHWND() {
         return hwnd;
     }
@@ -101,6 +111,18 @@ public class FastVulkanWindow implements AutoCloseable {
     public int getY() {
         if (nativeHandle == 0) return 0;
         return nGetY(nativeHandle);
+    }
+
+    public void setClearColor(float r, float g, float b, float a) {
+        if (nativeHandle != 0) {
+            nSetClearColor(nativeHandle, r, g, b, a);
+        }
+    }
+
+    public void setTitle(String title) {
+        if (nativeHandle != 0) {
+            nSetTitle(nativeHandle, title);
+        }
     }
 
     public void setLocation(int x, int y) {
@@ -151,11 +173,6 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
-    public boolean isFullscreen() {
-        if (nativeHandle == 0) return false;
-        return nIsFullscreen(nativeHandle);
-    }
-
     public void minimize() {
         if (nativeHandle != 0) {
             nMinimize(nativeHandle);
@@ -186,7 +203,7 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
-    public void setIconImage(java.awt.image.BufferedImage image) {
+    public void setIconImage(BufferedImage image) {
         if (nativeHandle != 0 && image != null) {
             int w = image.getWidth();
             int h = image.getHeight();
@@ -194,16 +211,6 @@ public class FastVulkanWindow implements AutoCloseable {
             image.getRGB(0, 0, w, h, pixels, 0, w);
             nSetIcon(nativeHandle, pixels, w, h);
         }
-    }
-
-    public boolean isKeyDown(int keyCode) {
-        if (nativeHandle == 0) return false;
-        return nIsKeyDown(nativeHandle, keyCode);
-    }
-
-    public boolean isKeyJustPressed(int keyCode) {
-        if (nativeHandle == 0) return false;
-        return nIsKeyJustPressed(nativeHandle, keyCode);
     }
 
     public int getMouseX() {
@@ -216,11 +223,6 @@ public class FastVulkanWindow implements AutoCloseable {
         return nGetMouseY(nativeHandle);
     }
 
-    public boolean isMouseButtonDown(int button) {
-        if (nativeHandle == 0) return false;
-        return nIsMouseButtonDown(nativeHandle, button);
-    }
-
     @Override
     public void close() {
         if (nativeHandle != 0) {
@@ -228,43 +230,6 @@ public class FastVulkanWindow implements AutoCloseable {
             nativeHandle = 0;
         }
     }
-
-    // JNI Native methods
-    private static native long nCreateWindow(String title, int width, int height, float r, float g, float b, float a);
-    private static native void nDestroyWindow(long handle);
-    private static native boolean nPollEvents(long handle);
-    private static native void nRenderAndPresent(long handle);
-    private static native void nSetClearColor(long handle, float r, float g, float b, float a);
-    private static native void nSetTitle(long handle, String title);
-    private static native long nGetHWND(long handle);
-    private static native int nGetWidth(long handle);
-    private static native int nGetHeight(long handle);
-    private static native void nSetLocation(long handle, int x, int y);
-    private static native int nGetX(long handle);
-    private static native int nGetY(long handle);
-    private static native void nSetDimensions(long handle, int width, int height);
-    private static native void nSetBounds(long handle, int x, int y, int width, int height);
-    private static native void nCenterOnScreen(long handle);
-    private static native void nSetVisible(long handle, boolean visible);
-    private static native void nSetResizable(long handle, boolean resizable);
-    private static native void nSetAlwaysOnTop(long handle, boolean alwaysOnTop);
-    private static native void nSetFullscreen(long handle, boolean fullscreen);
-    private static native boolean nIsFullscreen(long handle);
-    private static native void nMinimize(long handle);
-    private static native void nMaximize(long handle);
-    private static native void nRestore(long handle);
-    private static native void nSetMinSize(long handle, int minW, int minH);
-    private static native void nSetMaxSize(long handle, int maxW, int maxH);
-    private static native void nSetIcon(long handle, int[] pixels, int width, int height);
-    private static native long nCreateTexture(long handle, int[] pixels, int width, int height, boolean mipmaps);
-    private static native void nDestroyTexture(long handle, long texHandle);
-    private static native void nDrawImage(long handle, long texHandle, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);
-    private static native void nFlushBatch(long handle);
-    private static native boolean nIsKeyDown(long handle, int keyCode);
-    private static native boolean nIsKeyJustPressed(long handle, int keyCode);
-    private static native int nGetMouseX(long handle);
-    private static native int nGetMouseY(long handle);
-    private static native boolean nIsMouseButtonDown(long handle, int button);
 
     public void drawColoredRect(float x, float y, float w, float h, float r, float g, float b, float a) {
         if (nativeHandle != 0) nDrawColoredRect(nativeHandle, x, y, w, h, r, g, b, a);
@@ -275,10 +240,85 @@ public class FastVulkanWindow implements AutoCloseable {
     }
 
     public void drawColoredRoundRect(float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth) {
-        if (nativeHandle != 0) nDrawColoredRoundRect(nativeHandle, x, y, w, h, rx, ry, r, g, b, a, antialias, outline, strokeWidth);
+        if (nativeHandle != 0)
+            nDrawColoredRoundRect(nativeHandle, x, y, w, h, rx, ry, r, g, b, a, antialias, outline, strokeWidth);
     }
 
+    // JNI Native methods
+
+    private static native long nCreateWindow(String title, int width, int height, float r, float g, float b, float a);
+
+    private static native void nDestroyWindow(long handle);
+
+    private static native boolean nPollEvents(long handle);
+
+    private static native void nRenderAndPresent(long handle);
+
+    private static native void nSetClearColor(long handle, float r, float g, float b, float a);
+
+    private static native void nSetTitle(long handle, String title);
+
+    private static native long nGetHWND(long handle);
+
+    private static native int nGetWidth(long handle);
+
+    private static native int nGetHeight(long handle);
+
+    private static native void nSetLocation(long handle, int x, int y);
+
+    private static native int nGetX(long handle);
+
+    private static native int nGetY(long handle);
+
+    private static native void nSetDimensions(long handle, int width, int height);
+
+    private static native void nSetBounds(long handle, int x, int y, int width, int height);
+
+    private static native void nCenterOnScreen(long handle);
+
+    private static native void nSetVisible(long handle, boolean visible);
+
+    private static native void nSetResizable(long handle, boolean resizable);
+
+    private static native void nSetAlwaysOnTop(long handle, boolean alwaysOnTop);
+
+    private static native void nSetFullscreen(long handle, boolean fullscreen);
+
+    private static native boolean nIsFullscreen(long handle);
+
+    private static native void nMinimize(long handle);
+
+    private static native void nMaximize(long handle);
+
+    private static native void nRestore(long handle);
+
+    private static native void nSetMinSize(long handle, int minW, int minH);
+
+    private static native void nSetMaxSize(long handle, int maxW, int maxH);
+
+    private static native void nSetIcon(long handle, int[] pixels, int width, int height);
+
+    private static native long nCreateTexture(long handle, int[] pixels, int width, int height, boolean mipmaps);
+
+    private static native void nDestroyTexture(long handle, long texHandle);
+
+    private static native void nDrawImage(long handle, long texHandle, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);
+
+    private static native void nFlushBatch(long handle);
+
+    private static native boolean nIsKeyDown(long handle, int keyCode);
+
+    private static native boolean nIsKeyJustPressed(long handle, int keyCode);
+
+    private static native int nGetMouseX(long handle);
+
+    private static native int nGetMouseY(long handle);
+
+    private static native boolean nIsMouseButtonDown(long handle, int button);
+
     private static native void nDrawColoredRect(long handle, float x, float y, float w, float h, float r, float g, float b, float a);
+
     private static native void nDrawColoredOval(long handle, float x, float y, float w, float h, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
+
     private static native void nDrawColoredRoundRect(long handle, float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
 }
