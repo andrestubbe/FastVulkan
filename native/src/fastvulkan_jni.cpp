@@ -179,6 +179,26 @@ JNIEXPORT jlong JNICALL Java_fastvulkan_FastVulkanWindow_nCreateTexture(
     return (jlong)tex;
 }
 
+JNIEXPORT jboolean JNICALL Java_fastvulkan_FastVulkanWindow_nUpdateTexture(
+    JNIEnv* env, jclass clazz, jlong handle, jlong texHandle, jintArray pixels, jint width, jint height) {
+    if (!handle || !texHandle || !pixels || width <= 0 || height <= 0) return JNI_FALSE;
+
+    jint* rawPixels = env->GetIntArrayElements(pixels, nullptr);
+    bool ok = UpdateTexture((VulkanWindowContext*)handle, (VulkanTexture*)texHandle, (const uint32_t*)rawPixels, (uint32_t)width, (uint32_t)height);
+    env->ReleaseIntArrayElements(pixels, rawPixels, JNI_ABORT);
+
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// FastJava Zero-Copy Direct Memory Pipeline (FastPointer / FastMemory / FastSharedMemory)
+JNIEXPORT jboolean JNICALL Java_fastvulkan_FastVulkanWindow_nUpdateTexturePointer(
+    JNIEnv* env, jclass clazz, jlong handle, jlong texHandle, jlong nativePixelAddress, jint width, jint height) {
+    if (!handle || !texHandle || nativePixelAddress == 0 || width <= 0 || height <= 0) return JNI_FALSE;
+
+    bool ok = UpdateTexture((VulkanWindowContext*)handle, (VulkanTexture*)texHandle, (const uint32_t*)nativePixelAddress, (uint32_t)width, (uint32_t)height);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDestroyTexture(
     JNIEnv* env, jclass clazz, jlong handle, jlong texHandle) {
     if (handle && texHandle) {

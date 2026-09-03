@@ -72,6 +72,7 @@ public class DemoImageZoom {
             gIcon.dispose();
             window.setIconImage(icon);
 
+            FastVulkanGraphics vkg = new FastVulkanGraphics(window);
             long lastFpsTime = System.nanoTime();
             int frames = 0;
 
@@ -84,8 +85,6 @@ public class DemoImageZoom {
 
                 float winW = (float)window.getWidth();
                 float winH = (float)window.getHeight();
-                if (winW <= 0) winW = 1280.0f;
-                if (winH <= 0) winH = 720.0f;
 
                 // Compute aspect-ratio fill scale so image ALWAYS completely covers the entire window without borders
                 float scaleX = winW / (float)imgW;
@@ -98,8 +97,8 @@ public class DemoImageZoom {
                 float posX = (winW - renderW) * 0.5f;
                 float posY = (winH - renderH) * 0.5f;
 
-                // Draw hardware-filtered antialiased textured quad
-                window.drawImage(texture, posX, posY, renderW, renderH);
+                // Draw hardware-filtered antialiased textured quad using FastVulkanGraphics API
+                vkg.drawImage(texture, posX, posY, renderW, renderH);
 
                 window.present();
 

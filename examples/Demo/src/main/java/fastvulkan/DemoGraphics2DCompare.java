@@ -217,7 +217,7 @@ public class DemoGraphics2DCompare {
                 if (curH <= 0) curH = winH;
 
                 if (showJava2D) {
-                    window.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
+                    vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
                 } else {
                     renderVulkanScene(vkg, testImg);
                 }

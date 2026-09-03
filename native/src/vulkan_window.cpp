@@ -532,15 +532,17 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
         if (ctx->descriptorSetLayout) { vkDestroyDescriptorSetLayout(ctx->device, ctx->descriptorSetLayout, nullptr); ctx->descriptorSetLayout = VK_NULL_HANDLE; }
         if (ctx->descriptorPool) { vkDestroyDescriptorPool(ctx->device, ctx->descriptorPool, nullptr); ctx->descriptorPool = VK_NULL_HANDLE; }
 
-        if (ctx->vertexBuffer) {
-            if (ctx->vertexBufferMapped) {
-                vkUnmapMemory(ctx->device, ctx->vertexBufferMemory);
-                ctx->vertexBufferMapped = nullptr;
+        for (int i = 0; i < ctx->MAX_FRAMES_IN_FLIGHT; i++) {
+            if (ctx->vertexBuffers[i] != VK_NULL_HANDLE) {
+                if (ctx->vertexBuffersMapped[i]) {
+                    vkUnmapMemory(ctx->device, ctx->vertexBufferMemories[i]);
+                    ctx->vertexBuffersMapped[i] = nullptr;
+                }
+                vkDestroyBuffer(ctx->device, ctx->vertexBuffers[i], nullptr);
+                ctx->vertexBuffers[i] = VK_NULL_HANDLE;
+                vkFreeMemory(ctx->device, ctx->vertexBufferMemories[i], nullptr);
+                ctx->vertexBufferMemories[i] = VK_NULL_HANDLE;
             }
-            vkDestroyBuffer(ctx->device, ctx->vertexBuffer, nullptr);
-            ctx->vertexBuffer = VK_NULL_HANDLE;
-            vkFreeMemory(ctx->device, ctx->vertexBufferMemory, nullptr);
-            ctx->vertexBufferMemory = VK_NULL_HANDLE;
         }
 
         for (int i = 0; i < ctx->MAX_FRAMES_IN_FLIGHT; i++) {
@@ -558,8 +560,41 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
             vkDestroyCommandPool(ctx->device, ctx->commandPool, nullptr);
         }
 
-        if (ctx->renderPass != VK_NULL_HANDLE) {
-            vkDestroyRenderPass(ctx->device, ctx->renderPass, nullptr);
+        // Flush and clean up any remaining deferred pending textures
+        for (const auto& rt : ctx->pendingDestroy) {
+            VulkanTexture* tex = rt.tex;
+            if (tex) {
+                if (tex->descriptorSet != VK_NULL_HANDLE && ctx->descriptorPool != VK_NULL_HANDLE) {
+                    vkFreeDescriptorSets(ctx->device, ctx->descriptorPool, 1, &tex->descriptorSet);
+                }
+                if (tex->sampler) vkDestroySampler(ctx->device, tex->sampler, nullptr);
+                if (tex->view) vkDestroyImageView(ctx->device, tex->view, nullptr);
+                if (tex->image) vkDestroyImage(ctx->device, tex->image, nullptr);
+                if (tex->memory) vkFreeMemory(ctx->device, tex->memory, nullptr);
+                delete tex;
+            }
+        }
+        ctx->pendingDestroy.clear();
+
+        // Clean up preallocated staging buffer pool
+        for (int i = 0; i < ctx->STAGING_POOL_SIZE; i++) {
+            auto& s = ctx->stagingPool[i];
+            if (s.mapped && s.memory != VK_NULL_HANDLE) {
+                vkUnmapMemory(ctx->device, s.memory);
+                s.mapped = nullptr;
+            }
+            if (s.buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(ctx->device, s.buffer, nullptr);
+                s.buffer = VK_NULL_HANDLE;
+            }
+            if (s.memory != VK_NULL_HANDLE) {
+                vkFreeMemory(ctx->device, s.memory, nullptr);
+                s.memory = VK_NULL_HANDLE;
+            }
+            if (s.fence != VK_NULL_HANDLE) {
+                vkDestroyFence(ctx->device, s.fence, nullptr);
+                s.fence = VK_NULL_HANDLE;
+            }
         }
 
         vkDestroyDevice(ctx->device, nullptr);
@@ -851,6 +886,29 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
 
     vkResetFences(ctx->device, 1, &ctx->inFlightFences[ctx->currentFrame]);
 
+    // Zero-Stall Deferred Deletion: Safely clean up textures once all in-flight frames have finished using them
+    ctx->frameCounter++;
+    if (!ctx->pendingDestroy.empty()) {
+        auto& pd = ctx->pendingDestroy;
+        pd.erase(std::remove_if(pd.begin(), pd.end(), [&](const VulkanWindowContext::RetiredTexture& rt) {
+            if (ctx->frameCounter - rt.retiredAtFrame < ctx->MAX_FRAMES_IN_FLIGHT) {
+                return false; // Still potentially referenced by a previous in-flight frame
+            }
+            VulkanTexture* t = rt.tex;
+            if (t) {
+                if (t->descriptorSet != VK_NULL_HANDLE && ctx->descriptorPool != VK_NULL_HANDLE) {
+                    vkFreeDescriptorSets(ctx->device, ctx->descriptorPool, 1, &t->descriptorSet);
+                }
+                if (t->sampler) vkDestroySampler(ctx->device, t->sampler, nullptr);
+                if (t->view) vkDestroyImageView(ctx->device, t->view, nullptr);
+                if (t->image) vkDestroyImage(ctx->device, t->image, nullptr);
+                if (t->memory) vkFreeMemory(ctx->device, t->memory, nullptr);
+                delete t;
+            }
+            return true;
+        }), pd.end());
+    }
+
     VkCommandBuffer cmd = ctx->commandBuffers[ctx->currentFrame];
     vkResetCommandBuffer(cmd, 0);
 
@@ -903,10 +961,10 @@ void RenderAndPresent(VulkanWindowContext* ctx) {
         vkCmdPushConstants(cmd, ctx->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ortho), ortho);
 
         size_t count = (std::min)(ctx->queuedVertices.size(), ctx->MAX_VERTICES);
-        memcpy(ctx->vertexBufferMapped, ctx->queuedVertices.data(), sizeof(Vertex2D) * count);
+        memcpy(ctx->vertexBuffersMapped[ctx->currentFrame], ctx->queuedVertices.data(), sizeof(Vertex2D) * count);
 
         VkDeviceSize offsets[] = { 0 };
-        vkCmdBindVertexBuffers(cmd, 0, 1, &ctx->vertexBuffer, offsets);
+        vkCmdBindVertexBuffers(cmd, 0, 1, &ctx->vertexBuffers[ctx->currentFrame], offsets);
 
         for (const auto& batch : ctx->drawBatches) {
             if (batch.vertexCount == 0) continue;

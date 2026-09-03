@@ -129,10 +129,9 @@ public class DemoStressBenchmark {
                     renderVulkan(vkg, shapeCount);
                 } else {
                     renderJava2D(j2dGraphics, shapeCount);
-                    // Fast zero-copy upload of Java2D buffer to texture
-                    window.destroyTexture(j2dTexture);
-                    j2dTexture = window.createTexture(j2dPixels, WIN_W, WIN_H, false);
-                    window.drawImage(j2dTexture, 0f, 0f, (float)WIN_W, (float)WIN_H);
+                    // Fast GPU Texture Streaming: update pixels directly without reallocating VkImage or stalling
+                    vkg.updateTexture(j2dTexture, j2dPixels, WIN_W, WIN_H);
+                    vkg.drawImage(j2dTexture, 0f, 0f, (float)WIN_W, (float)WIN_H);
                 }
 
                 window.present();

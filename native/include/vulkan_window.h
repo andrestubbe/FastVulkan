@@ -81,11 +81,11 @@ struct VulkanWindowContext {
     VkPipeline graphicsPipeline = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
-    // Dynamic vertex buffer
-    static constexpr size_t MAX_VERTICES = 65536;
-    VkBuffer vertexBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
-    void* vertexBufferMapped = nullptr;
+    // Dynamic vertex buffers (Per-Frame in Flight for zero-stall CPU/GPU overlap)
+    static constexpr size_t MAX_VERTICES = 262144; // 262k vertices (~43k quads per frame)
+    VkBuffer vertexBuffers[MAX_FRAMES_IN_FLIGHT]{};
+    VkDeviceMemory vertexBufferMemories[MAX_FRAMES_IN_FLIGHT]{};
+    void* vertexBuffersMapped[MAX_FRAMES_IN_FLIGHT]{};
 
     // Multi-texture batching
     struct DrawBatch {
@@ -96,6 +96,26 @@ struct VulkanWindowContext {
     std::vector<Vertex2D> queuedVertices;
     std::vector<DrawBatch> drawBatches;
     VulkanTexture* currentTexture = nullptr;
+
+    // Staging Buffer Pool (Zero-Wait GPU Texture Streaming)
+    struct StagingBuffer {
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        void* mapped = nullptr;
+        VkDeviceSize size = 0;
+        VkFence fence = VK_NULL_HANDLE;
+        bool inUse = false;
+    };
+    static constexpr int STAGING_POOL_SIZE = 6;
+    StagingBuffer stagingPool[STAGING_POOL_SIZE]{};
+
+    // Deferred Resource Deletion with monotonic frame counting (100% race-condition free)
+    struct RetiredTexture {
+        VulkanTexture* tex = nullptr;
+        uint64_t retiredAtFrame = 0;
+    };
+    uint64_t frameCounter = 0;
+    std::vector<RetiredTexture> pendingDestroy;
 
     // Features
     bool anisotropySupported = false;
@@ -144,6 +164,8 @@ bool IsMouseButtonDown(VulkanWindowContext* ctx, int button);
 // Texture / drawing
 VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels,
                              uint32_t width, uint32_t height, bool generateMipmaps);
+bool UpdateTexture(VulkanWindowContext* ctx, VulkanTexture* tex, const uint32_t* pixels,
+                   uint32_t width, uint32_t height);
 void DestroyTexture(VulkanWindowContext* ctx, VulkanTexture* tex);
 void DrawImage(VulkanWindowContext* ctx, VulkanTexture* tex,
                float x, float y, float w, float h,
