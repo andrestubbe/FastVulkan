@@ -14,7 +14,16 @@ import java.awt.image.DataBufferInt;
 
 public class DemoGraphics2DCompare {
 
-    private static boolean showJava2D = true;
+    public enum CompareEngine {
+        VULKAN_FACES("1/3: Vulkan Faces (Native GPU 16x SDF)"),
+        VULKAN_MARLIN("2/3: Vulkan Märlin (Offscreen Texture Twin)"),
+        JAVA2D("3/3: Java2D Reference (AWT Baseline)");
+
+        public final String label;
+        CompareEngine(String label) { this.label = label; }
+    }
+
+    private static CompareEngine currentEngine = CompareEngine.VULKAN_FACES;
 
     // Homogeneous 100x100 Test Image
     private static BufferedImage createTestImage(int size) {
@@ -203,11 +212,20 @@ public class DemoGraphics2DCompare {
             long j2dTexture = window.createTexture(j2dPixels, winW, winH, false);
             FastVulkanGraphics vkg = new FastVulkanGraphics(window);
 
+            System.out.println("=================================================================");
+            System.out.println(" FastVulkan vs Marlin vs Java2D 1:1 Engine Comparison:");
+            System.out.println("   [1/3] Vulkan Faces   : Pure Native GPU 16x Subpixel SDF Shaders");
+            System.out.println("   [2/3] Vulkan Märlin  : Offscreen Marlin Rasterization -> GPU Texture Twin");
+            System.out.println("   [3/3] Java2D         : Standard Java2D / AWT Baseline");
+            System.out.println("   [SPACE]              : Cycle through all three engines");
+            System.out.println("=================================================================");
+
             // Bind FastKeyboard to the window for zero-latency toggle
             try (FastKeyboard keyboard = FastKeyboard.openForWindow(hwnd)) {
                 keyboard.startListening((dev, vKey, makeCode, isPressed, isE0, ts, keyChar) -> {
                     if (isPressed && vKey == Keys.SPACE) {
-                        showJava2D = !showJava2D;
+                        currentEngine = CompareEngine.values()[(currentEngine.ordinal() + 1) % CompareEngine.values().length];
+                        System.out.println("Active Engine: " + currentEngine.label);
                     }
                 });
 
@@ -222,10 +240,18 @@ public class DemoGraphics2DCompare {
                     if (curW <= 0) curW = winW;
                     if (curH <= 0) curH = winH;
 
-                    if (showJava2D) {
-                        vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
-                    } else {
-                        renderVulkanScene(vkg, testImg);
+                    switch (currentEngine) {
+                        case VULKAN_FACES -> {
+                            vkg.setEngineMode(FastVulkanGraphics.EngineMode.VULKAN_FACES);
+                            renderVulkanScene(vkg, testImg);
+                        }
+                        case VULKAN_MARLIN -> {
+                            vkg.setEngineMode(FastVulkanGraphics.EngineMode.VULKAN_MARLIN);
+                            vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
+                        }
+                        case JAVA2D -> {
+                            vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
+                        }
                     }
 
                     window.present();
@@ -233,8 +259,7 @@ public class DemoGraphics2DCompare {
                     frames++;
                     long now = System.nanoTime();
                     if (now - lastFpsTime >= 1_000_000_000L) {
-                        String mode = showJava2D ? "JAVA2D Reference" : "FASTVULKAN Native (16x Subpixel SDF)";
-                        window.setTitle("[" + mode + "] FPS: " + frames + "  [SPACE] flip");
+                        window.setTitle("[" + currentEngine.label + "] FPS: " + frames + "  [SPACE] cycle");
                         frames = 0;
                         lastFpsTime = now;
                     }

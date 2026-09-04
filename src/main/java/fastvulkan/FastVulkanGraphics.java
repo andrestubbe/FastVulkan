@@ -28,7 +28,26 @@ public class FastVulkanGraphics implements AutoCloseable {
     private static final int MAX_TEXTURE_CACHE_SIZE = 128;
     private static final int MAX_TEXT_CACHE_SIZE = 256;
 
+    /**
+     * Rendering engine modes supported by FastVulkan / FastGraphics.
+     */
+    public enum EngineMode {
+        /**
+         * Native GPU Analytical SDF Shaders:
+         * Ultra-fast sub-millisecond mathematical vector rendering directly on GPU.
+         */
+        VULKAN_FACES,
+
+        /**
+         * Hybrid Marlin Twin Pipeline:
+         * Uses Java2D's Marlin rasterizer for offscreen generation, streamed to GPU textures
+         * for 100% bit-exact parity with standard Java2D curves and font rendering.
+         */
+        VULKAN_MARLIN
+    }
+
     private final FastVulkanWindow window;
+    private EngineMode engineMode = EngineMode.VULKAN_FACES;
     private Color currentColor = Color.WHITE;
     private Font currentFont = new Font("Segoe UI", Font.PLAIN, 14);
     private boolean antiAliased = true;
@@ -264,6 +283,10 @@ public class FastVulkanGraphics implements AutoCloseable {
         return strokeWidth;
     }
 
+    public EngineMode getEngineMode() {
+        return engineMode;
+    }
+
     // ═══════════════════════════════════════════════════════════
     // Setter
     // ═══════════════════════════════════════════════════════════
@@ -279,7 +302,11 @@ public class FastVulkanGraphics implements AutoCloseable {
     }
 
     public void setStrokeWidth(float strokeWidth) {
-        this.strokeWidth = strokeWidth;
+        this.strokeWidth = Math.max(0.0f, strokeWidth);
+    }
+
+    public void setEngineMode(EngineMode engineMode) {
+        this.engineMode = engineMode != null ? engineMode : EngineMode.VULKAN_FACES;
     }
 
     public void setRenderingHint(RenderingHints.Key hintKey, Object hintValue) {
