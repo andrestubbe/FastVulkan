@@ -250,6 +250,7 @@ public class DemoGraphics2DCompare {
                         renderJava2DScene(offG, winW, winH, testImg);
                         offG.dispose();
                         lastCalcMicros[0] = (System.nanoTime() - t0) / 1000.0;
+                        window.updateTexture(j2dTexture, j2dPixels, winW, winH);
                         vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
                         vkg.flush();
                     }
