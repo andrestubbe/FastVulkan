@@ -48,6 +48,13 @@ public class DemoScreenshotMeshWarp {
     private static final float[] baseU = new float[GRID_POINTS];
     private static final float[] baseV = new float[GRID_POINTS];
 
+    // Precomputed per-vertex geometry & damping (eliminates >130,000 transcendentals/frame for 120+ FPS)
+    private static final float[] baseDX = new float[GRID_POINTS];
+    private static final float[] baseDY = new float[GRID_POINTS];
+    private static final float[] baseAngle = new float[GRID_POINTS];
+    private static final float[] baseNormDist = new float[GRID_POINTS];
+    private static final float[] baseBorderDamp = new float[GRID_POINTS];
+
     private static final float[] warpedPX = new float[GRID_POINTS];
     private static final float[] warpedPY = new float[GRID_POINTS];
 
@@ -100,15 +107,82 @@ public class DemoScreenshotMeshWarp {
                 quadIndices[k++] = p01;
             }
         }
+
+        // 3. Precompute static geometry & edge border damping for all 32,776 vertices
+        final float cx = WIN_W * 0.5f;
+        final float cy = WIN_H * 0.5f;
+        for (int i = 0; i < GRID_POINTS; i++) {
+            float dx = basePX[i] - cx;
+            float dy = basePY[i] - cy;
+            float dist = (float) Math.sqrt(dx * dx + dy * dy);
+            baseDX[i] = dx;
+            baseDY[i] = dy;
+            baseAngle[i] = (float) Math.atan2(dy, dx);
+            baseNormDist[i] = dist / 600.0f;
+
+            float u = baseU[i];
+            float v = baseV[i];
+            float edgeDistX = Math.min(u, 1.0f - u) * 2.0f;
+            float edgeDistY = Math.min(v, 1.0f - v) * 2.0f;
+            float dampX = (float) Math.sin(Math.min(1.0f, edgeDistX * 4.0f) * (Math.PI * 0.5));
+            float dampY = (float) Math.sin(Math.min(1.0f, edgeDistY * 4.0f) * (Math.PI * 0.5));
+            baseBorderDamp[i] = dampX * dampY;
+        }
+
+        // 4. Pre-fill static UVs and RGBA=1.0 for textured mesh (avoids 1.1M redundant writes/frame)
+        for (int q = 0; q < VERTEX_COUNT; q++) {
+            int pIdx = quadIndices[q];
+            int base = q * 8;
+            vertexData[base + 2] = baseU[pIdx];
+            vertexData[base + 3] = baseV[pIdx];
+            vertexData[base + 4] = 1.0f;
+            vertexData[base + 5] = 1.0f;
+            vertexData[base + 6] = 1.0f;
+            vertexData[base + 7] = 1.0f;
+        }
+
+        // 5. Pre-fill static UVs and colors for circle overlay vertices
+        final float cr = 0.05f, cg = 0.95f, cb = 1.0f, ca = 0.85f;
+        final float u0 = -31.0f, u1 = -29.0f, v0 = -1.0f, v1 = 1.0f;
+        for (int i = 0; i < GRID_POINTS; i++) {
+            int base = i * 48; // 6 vertices * 8 floats
+            // Tri 1
+            circleVertexData[base +  2] = u0; circleVertexData[base +  3] = v0;
+            circleVertexData[base +  4] = cr; circleVertexData[base +  5] = cg;
+            circleVertexData[base +  6] = cb; circleVertexData[base +  7] = ca;
+
+            circleVertexData[base + 10] = u1; circleVertexData[base + 11] = v0;
+            circleVertexData[base + 12] = cr; circleVertexData[base + 13] = cg;
+            circleVertexData[base + 14] = cb; circleVertexData[base + 15] = ca;
+
+            circleVertexData[base + 18] = u1; circleVertexData[base + 19] = v1;
+            circleVertexData[base + 20] = cr; circleVertexData[base + 21] = cg;
+            circleVertexData[base + 22] = cb; circleVertexData[base + 23] = ca;
+
+            // Tri 2
+            circleVertexData[base + 26] = u0; circleVertexData[base + 27] = v0;
+            circleVertexData[base + 28] = cr; circleVertexData[base + 29] = cg;
+            circleVertexData[base + 30] = cb; circleVertexData[base + 31] = ca;
+
+            circleVertexData[base + 34] = u1; circleVertexData[base + 35] = v1;
+            circleVertexData[base + 36] = cr; circleVertexData[base + 37] = cg;
+            circleVertexData[base + 38] = cb; circleVertexData[base + 39] = ca;
+
+            circleVertexData[base + 42] = u0; circleVertexData[base + 43] = v1;
+            circleVertexData[base + 44] = cr; circleVertexData[base + 45] = cg;
+            circleVertexData[base + 46] = cb; circleVertexData[base + 47] = ca;
+        }
     }
 
     /**
      * Deduplicated mathematical effect displacement evaluator.
      * Computes (offX, offY) displacement for a given effect ID at vertex coordinates.
      */
-    private static void computeEffect(int effect, float bx, float by, float cx, float cy,
-                                      float dx, float dy, float dist, float angle, float normDist,
-                                      float t, float[] out) {
+    private static void computeEffect(int effect, float bx, float by,
+                                      float dx, float dy, float angle, float normDist,
+                                      float t,
+                                      float pole1x, float pole1y, float pole2x, float pole2y,
+                                      float[] out) {
         float offX = 0.0f;
         float offY = 0.0f;
 
@@ -185,13 +259,9 @@ public class DemoScreenshotMeshWarp {
                 offY = drip;
             }
             case 10 -> {
-                // 10. Magnetic Dipole Field Lines
-                float p1x = cx + (float) Math.cos(t * 2.0f) * 250.0f;
-                float p1y = cy + (float) Math.sin(t * 2.0f) * 150.0f;
-                float p2x = cx - (float) Math.cos(t * 2.0f) * 250.0f;
-                float p2y = cy - (float) Math.sin(t * 2.0f) * 150.0f;
-                float d1x = bx - p1x, d1y = by - p1y;
-                float d2x = bx - p2x, d2y = by - p2y;
+                // 10. Magnetic Dipole Field Lines (precomputed dynamic poles)
+                float d1x = bx - pole1x, d1y = by - pole1y;
+                float d2x = bx - pole2x, d2y = by - pole2y;
                 float dist1 = (float) Math.sqrt(d1x * d1x + d1y * d1y) + 30.0f;
                 float dist2 = (float) Math.sqrt(d2x * d2x + d2y * d2y) + 30.0f;
                 float force1 = 4000.0f / (dist1 * dist1);
@@ -266,23 +336,30 @@ public class DemoScreenshotMeshWarp {
         final float cx = WIN_W * 0.5f;
         final float cy = WIN_H * 0.5f;
 
+        // Precompute dynamic dipole pole positions once per frame (avoids 65,000 transcendentals)
+        float cos2t = (float) Math.cos(t * 2.0f);
+        float sin2t = (float) Math.sin(t * 2.0f);
+        float pole1x = cx + cos2t * 250.0f;
+        float pole1y = cy + sin2t * 150.0f;
+        float pole2x = cx - cos2t * 250.0f;
+        float pole2y = cy - sin2t * 150.0f;
+
         float[] off1 = new float[2];
         float[] off2 = new float[2];
 
         for (int i = 0; i < GRID_POINTS; i++) {
             float bx = basePX[i];
             float by = basePY[i];
-
-            float dx = bx - cx;
-            float dy = by - cy;
-            float dist = (float) Math.sqrt(dx * dx + dy * dy);
-            float angle = (float) Math.atan2(dy, dx);
-            float normDist = dist / 600.0f;
+            float dx = baseDX[i];
+            float dy = baseDY[i];
+            float angle = baseAngle[i];
+            float normDist = baseNormDist[i];
+            float borderDamp = baseBorderDamp[i];
 
             // Compute Displacement for active and next effect
-            computeEffect(activeEffect, bx, by, cx, cy, dx, dy, dist, angle, normDist, t, off1);
+            computeEffect(activeEffect, bx, by, dx, dy, angle, normDist, t, pole1x, pole1y, pole2x, pole2y, off1);
             if (blendNext > 0.001f) {
-                computeEffect(nextEffect, bx, by, cx, cy, dx, dy, dist, angle, normDist, t, off2);
+                computeEffect(nextEffect, bx, by, dx, dy, angle, normDist, t, pole1x, pole1y, pole2x, pole2y, off2);
             } else {
                 off2[0] = 0.0f;
                 off2[1] = 0.0f;
@@ -292,54 +369,27 @@ public class DemoScreenshotMeshWarp {
             float dispX = off1[0] * blendCurr + off2[0] * blendNext;
             float dispY = off1[1] * blendCurr + off2[1] * blendNext;
 
-            // Pin borders: compute edge attenuation factor (0.0 at borders, 1.0 in center)
-            float u = baseU[i];
-            float v = baseV[i];
-            float edgeDistX = Math.min(u, 1.0f - u) * 2.0f;
-            float edgeDistY = Math.min(v, 1.0f - v) * 2.0f;
-            float dampX = (float) Math.sin(Math.min(1.0f, edgeDistX * 4.0f) * (Math.PI * 0.5));
-            float dampY = (float) Math.sin(Math.min(1.0f, edgeDistY * 4.0f) * (Math.PI * 0.5));
-            float borderDamp = dampX * dampY;
-
             warpedPX[i] = bx + dispX * borderDamp;
             warpedPY[i] = by + dispY * borderDamp;
         }
 
         // Pack mesh into contiguous interleaved array [x, y, u, v, r, g, b, a]
-        int vIdx = 0;
+        // Static UVs and RGBA colors were pre-initialized, so we only update X and Y!
         for (int k = 0; k < VERTEX_COUNT; k++) {
             int pIdx = quadIndices[k];
-            vertexData[vIdx + 0] = warpedPX[pIdx];
-            vertexData[vIdx + 1] = warpedPY[pIdx];
-            vertexData[vIdx + 2] = baseU[pIdx];
-            vertexData[vIdx + 3] = baseV[pIdx];
-            vertexData[vIdx + 4] = 1.0f; // RGBA 1.0
-            vertexData[vIdx + 5] = 1.0f;
-            vertexData[vIdx + 6] = 1.0f;
-            vertexData[vIdx + 7] = 1.0f;
-            vIdx += 8;
+            int base = k * 8;
+            vertexData[base]     = warpedPX[pIdx];
+            vertexData[base + 1] = warpedPY[pIdx];
         }
     }
 
     /**
      * Build vertex point circle overlay for all 32,776 grid vertices.
      * Uses Vulkan Mode -30 analytical 16x subpixel circle antialiasing.
+     * Only positions need updating since UVs and RGBA are pre-initialized.
      */
     private static void buildVertexCirclesData() {
         final float radius = 1.8f;
-        // High-contrast glowing cyan (RGBA)
-        final float cr = 0.05f;
-        final float cg = 0.95f;
-        final float cb = 1.0f;
-        final float ca = 0.85f;
-
-        // Mode -30 circle UVs
-        final float u0 = -31.0f;
-        final float u1 = -29.0f;
-        final float v0 = -1.0f;
-        final float v1 =  1.0f;
-
-        int idx = 0;
         for (int i = 0; i < GRID_POINTS; i++) {
             float cx = warpedPX[i];
             float cy = warpedPY[i];
@@ -349,39 +399,35 @@ public class DemoScreenshotMeshWarp {
             float x1 = cx + radius;
             float y1 = cy + radius;
 
+            int base = i * 48; // 6 vertices * 8 floats
             // Tri 1: (x0, y0), (x1, y0), (x1, y1)
-            circleVertexData[idx +  0] = x0; circleVertexData[idx +  1] = y0;
-            circleVertexData[idx +  2] = u0; circleVertexData[idx +  3] = v0;
-            circleVertexData[idx +  4] = cr; circleVertexData[idx +  5] = cg;
-            circleVertexData[idx +  6] = cb; circleVertexData[idx +  7] = ca;
-
-            circleVertexData[idx +  8] = x1; circleVertexData[idx +  9] = y0;
-            circleVertexData[idx + 10] = u1; circleVertexData[idx + 11] = v0;
-            circleVertexData[idx + 12] = cr; circleVertexData[idx + 13] = cg;
-            circleVertexData[idx + 14] = cb; circleVertexData[idx + 15] = ca;
-
-            circleVertexData[idx + 16] = x1; circleVertexData[idx + 17] = y1;
-            circleVertexData[idx + 18] = u1; circleVertexData[idx + 19] = v1;
-            circleVertexData[idx + 20] = cr; circleVertexData[idx + 21] = cg;
-            circleVertexData[idx + 22] = cb; circleVertexData[idx + 23] = ca;
+            circleVertexData[base +  0] = x0; circleVertexData[base +  1] = y0;
+            circleVertexData[base +  8] = x1; circleVertexData[base +  9] = y0;
+            circleVertexData[base + 16] = x1; circleVertexData[base + 17] = y1;
 
             // Tri 2: (x0, y0), (x1, y1), (x0, y1)
-            circleVertexData[idx + 24] = x0; circleVertexData[idx + 25] = y0;
-            circleVertexData[idx + 26] = u0; circleVertexData[idx + 27] = v0;
-            circleVertexData[idx + 28] = cr; circleVertexData[idx + 29] = cg;
-            circleVertexData[idx + 30] = cb; circleVertexData[idx + 31] = ca;
+            circleVertexData[base + 24] = x0; circleVertexData[base + 25] = y0;
+            circleVertexData[base + 32] = x1; circleVertexData[base + 33] = y1;
+            circleVertexData[base + 40] = x0; circleVertexData[base + 41] = y1;
+        }
+    }
 
-            circleVertexData[idx + 32] = x1; circleVertexData[idx + 33] = y1;
-            circleVertexData[idx + 34] = u1; circleVertexData[idx + 35] = v1;
-            circleVertexData[idx + 36] = cr; circleVertexData[idx + 37] = cg;
-            circleVertexData[idx + 38] = cb; circleVertexData[idx + 39] = ca;
-
-            circleVertexData[idx + 40] = x0; circleVertexData[idx + 41] = y1;
-            circleVertexData[idx + 42] = u0; circleVertexData[idx + 43] = v1;
-            circleVertexData[idx + 44] = cr; circleVertexData[idx + 45] = cg;
-            circleVertexData[idx + 46] = cb; circleVertexData[idx + 47] = ca;
-
-            idx += 48; // 6 vertices * 8 floats
+    /**
+     * High-precision hybrid sleep/spin frame pacer.
+     * Ensures rock-solid 120 FPS without OS timer jitter or VSync frame-drop penalty.
+     */
+    private static void paceFrame(int targetFps, long frameStartTime) {
+        if (targetFps <= 0) return; // Unlocked max throughput
+        long targetDurationNs = 1_000_000_000L / targetFps;
+        long targetTime = frameStartTime + targetDurationNs;
+        long remaining = targetTime - System.nanoTime();
+        if (remaining > 2_000_000L) {
+            try {
+                Thread.sleep((remaining - 1_500_000L) / 1_000_000L);
+            } catch (InterruptedException ignored) {}
+        }
+        while (System.nanoTime() < targetTime) {
+            Thread.onSpinWait();
         }
     }
 
@@ -453,6 +499,10 @@ public class DemoScreenshotMeshWarp {
             final int[] manualEffect = { -1 };
             final float[] pausedTime = { 0.0f };
 
+            // Target FPS modes: 120 FPS (Default), 144 FPS, 240 FPS, Unlocked, 60 FPS
+            final int[] TARGET_FPS_MODES = { 120, 144, 240, 0, 60 };
+            final int[] fpsModeIdx = { 0 };
+
             try (FastKeyboard keyboard = FastKeyboard.openForWindow(hwnd)) {
                 keyboard.startListening((dev, vKey, makeCode, isPressed, isE0, ts, keyChar) -> {
                     if (!isPressed) return;
@@ -467,6 +517,10 @@ public class DemoScreenshotMeshWarp {
                     } else if (vKey == Keys.V) {
                         showVertices[0] = !showVertices[0];
                         System.out.println("[Toggle] Vertex Circles Overlay: " + (showVertices[0] ? "ON" : "OFF"));
+                    } else if (vKey == Keys.F) {
+                        fpsModeIdx[0] = (fpsModeIdx[0] + 1) % TARGET_FPS_MODES.length;
+                        int cap = TARGET_FPS_MODES[fpsModeIdx[0]];
+                        System.out.println("[Frame Rate] Target Mode: " + (cap == 0 ? "Unlocked (Max Throughput)" : cap + " FPS"));
                     } else if (vKey == Keys.N) {
                         float curT = paused[0] ? pausedTime[0] : (float) ((System.nanoTime() - startTime[0]) / 1_000_000_000.0);
                         int current = manualEffect[0] >= 0 ? manualEffect[0] : (int) ((curT / EFFECT_DURATION) % NUM_EFFECTS);
@@ -491,13 +545,13 @@ public class DemoScreenshotMeshWarp {
                 });
 
                 while (window.pollEvents()) {
-                    FastDWM.waitForVSync();
+                    long frameStartTime = System.nanoTime();
 
-                    float time = paused[0] ? pausedTime[0] : (float) ((System.nanoTime() - startTime[0]) / 1_000_000_000.0);
+                    float time = paused[0] ? pausedTime[0] : (float) ((frameStartTime - startTime[0]) / 1_000_000_000.0);
 
                     long t0 = System.nanoTime();
 
-                    // 1. Apply smooth morphing multi-warp on 240x135 mesh
+                    // 1. Apply smooth morphing multi-warp on 240x135 mesh (ultra-fast precomputed math)
                     applySmoothMultiWarp(time, manualEffect[0]);
 
                     // 2. Zero-copy direct draw call of 194,400 vertices (64,800 triangles)
@@ -516,13 +570,18 @@ public class DemoScreenshotMeshWarp {
                     avgMicros = avgMicros * 0.9 + micros * 0.1;
                     frames++;
 
+                    // High-precision frame pacer (targets 120 FPS by default, or [F] to switch)
+                    paceFrame(TARGET_FPS_MODES[fpsModeIdx[0]], frameStartTime);
+
                     long now = System.nanoTime();
                     if (now - lastFpsTime >= 500_000_000L) {
                         int fps = (int) (frames * 1_000_000_000.0 / (now - lastFpsTime));
                         int activeIdx = manualEffect[0] >= 0 ? manualEffect[0] : (int) ((time / EFFECT_DURATION) % NUM_EFFECTS);
                         String effect = getEffectName(activeIdx);
-                        String title = String.format("[FastVulkan 65k Tris | 33k Verts] %s | FPS: %d | Mesh: %.1f µs | [V] Dots: %s | [SPACE] Pause | [N/P] Next/Prev",
-                                effect, fps, avgMicros, showVertices[0] ? "ON" : "OFF");
+                        int cap = TARGET_FPS_MODES[fpsModeIdx[0]];
+                        String capStr = cap == 0 ? "Unlocked" : cap + " FPS";
+                        String title = String.format("[FastVulkan 65k Tris | 33k Verts] %s | %d FPS (%s [F]) | Mesh: %.1f µs | [V] Dots: %s | [SPACE] Pause",
+                                effect, fps, capStr, avgMicros, showVertices[0] ? "ON" : "OFF");
                         window.setTitle(title);
                         frames = 0;
                         lastFpsTime = now;
