@@ -18,7 +18,9 @@
 
 FastVulkan provides a low-overhead GPU-accelerated 2D pipeline (instanced shapes, quad batching, texture rendering, and smooth zoom/transforms) with native C++ window management.
 
-[![FastVulkan Showcase](docs/screenshot.png)](https://github.com/andrestubbe/FastVulkan)
+[**Watch Showcase Demo (YouTube)**](https://youtu.be/QegGi2TQxks)
+
+[![FastVulkan Showcase](docs/screenshot.png)](https://youtu.be/QegGi2TQxks)
 
 ---
 
