@@ -3,6 +3,7 @@ package fastvulkan;
 import fastdwm.FastDWM;
 import fastkeyboard.FastKeyboard;
 import fastkeyboard.Keys;
+import fastscreen.FastScreen;
 import fasttheme.FastTheme;
 
 import java.awt.Dimension;
@@ -464,11 +465,44 @@ public class DemoScreenshotMeshWarp {
         System.out.println("   Capturing Desktop Screenshot texture...");
         System.out.println("=================================================================");
 
-        // 1. Capture live Desktop Screenshot via AWT Robot
-        BufferedImage screenshot = captureDesktop();
-        int imgW = screenshot.getWidth();
-        int imgH = screenshot.getHeight();
-        int[] pixels = ((DataBufferInt) screenshot.getRaster().getDataBuffer()).getData();
+        // 1. Initialize FastScreen DXGI Desktop Duplication capture
+        FastScreen fastScreen = null;
+        int imgW = 0;
+        int imgH = 0;
+        int[] pixels = null;
+
+        try {
+            fastScreen = new FastScreen();
+            Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+            imgW = screenSize.width;
+            imgH = screenSize.height;
+            boolean streamed = fastScreen.startStream(0, 0, imgW, imgH);
+            if (streamed) {
+                for (int attempt = 0; attempt < 15 && pixels == null; attempt++) {
+                    pixels = fastScreen.getNextFrame();
+                    if (pixels == null) Thread.sleep(20);
+                }
+            }
+            if (pixels != null) {
+                System.out.printf("   [FastScreen] DXGI Desktop Duplication active: %dx%d\n", imgW, imgH);
+            }
+        } catch (Throwable t) {
+            System.out.println("   [FastScreen] " + t.getMessage() + ", falling back to AWT Robot.");
+        }
+
+        // Fallback to AWT Robot if needed
+        if (pixels == null) {
+            System.out.println("   Capturing Desktop Screenshot texture via AWT Robot fallback...");
+            BufferedImage screenshot = captureDesktop();
+            imgW = screenshot.getWidth();
+            imgH = screenshot.getHeight();
+            pixels = ((DataBufferInt) screenshot.getRaster().getDataBuffer()).getData();
+        }
+
+        final int texW = imgW;
+        final int texH = imgH;
+        final FastScreen finalScreen = fastScreen;
+        final boolean[] liveStream = { fastScreen != null && pixels != null };
 
         // 2. Create Native Vulkan Window
         try (FastVulkanWindow window = new FastVulkanWindow(
@@ -485,9 +519,10 @@ public class DemoScreenshotMeshWarp {
 
             // Exclude this window from screen capture (prevents recursive hall-of-mirrors feedback)
             window.setExcludeFromCapture(true);
+            FastScreen.excludeWindow(hwnd);
 
             // 3. Upload screenshot to native Vulkan GPU texture
-            long texture = window.createTexture(pixels, imgW, imgH, true);
+            long texture = window.createTexture(pixels, texW, texH, true);
             if (texture == 0) {
                 throw new RuntimeException("Failed to upload screenshot texture to Vulkan!");
             }
@@ -520,6 +555,13 @@ public class DemoScreenshotMeshWarp {
                     } else if (vKey == Keys.V) {
                         showVertices[0] = !showVertices[0];
                         System.out.println("[Toggle] Vertex Circles Overlay: " + (showVertices[0] ? "ON" : "OFF"));
+                    } else if (vKey == Keys.L) {
+                        if (finalScreen != null) {
+                            liveStream[0] = !liveStream[0];
+                            System.out.println("[Stream] Live Desktop Streaming: " + (liveStream[0] ? "ON (DXGI Live)" : "PAUSED (Freeze Frame)"));
+                        } else {
+                            System.out.println("[Stream] FastScreen DXGI not available.");
+                        }
                     } else if (vKey == Keys.F) {
                         fpsModeIdx[0] = (fpsModeIdx[0] + 1) % TARGET_FPS_MODES.length;
                         int cap = TARGET_FPS_MODES[fpsModeIdx[0]];
@@ -549,6 +591,14 @@ public class DemoScreenshotMeshWarp {
 
                 while (window.pollEvents()) {
                     long frameStartTime = System.nanoTime();
+
+                    // Live desktop texture streaming via FastScreen DXGI
+                    if (liveStream[0] && finalScreen != null) {
+                        int[] newFrame = finalScreen.getNextFrame();
+                        if (newFrame != null) {
+                            window.updateTexture(texture, newFrame, texW, texH);
+                        }
+                    }
 
                     float time = paused[0] ? pausedTime[0] : (float) ((frameStartTime - startTime[0]) / 1_000_000_000.0);
 
@@ -583,13 +633,18 @@ public class DemoScreenshotMeshWarp {
                         String effect = getEffectName(activeIdx);
                         int cap = TARGET_FPS_MODES[fpsModeIdx[0]];
                         String capStr = cap == 0 ? "Unlocked" : cap + " FPS";
-                        String title = String.format("[FastVulkan 65k Tris | 33k Verts] %s | %d FPS (%s [F]) | Mesh: %.1f µs | [V] Dots: %s | [SPACE] Pause",
-                                effect, fps, capStr, avgMicros, showVertices[0] ? "ON" : "OFF");
+                        String streamStatus = liveStream[0] ? "LIVE" : "FREEZE";
+                        String title = String.format("[FastVulkan 65k Tris | 33k Verts] %s | %d FPS (%s [F]) | Stream: %s [L] | Dots: %s [V] | [SPACE] Pause",
+                                effect, fps, capStr, streamStatus, showVertices[0] ? "ON" : "OFF");
                         window.setTitle(title);
                         frames = 0;
                         lastFpsTime = now;
                     }
                 }
+            }
+
+            if (finalScreen != null) {
+                finalScreen.dispose();
             }
 
             window.destroyTexture(texture);
