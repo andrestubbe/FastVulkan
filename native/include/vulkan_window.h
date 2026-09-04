@@ -139,6 +139,7 @@ void CenterWindowOnScreen(VulkanWindowContext* ctx);
 void SetWindowVisible(VulkanWindowContext* ctx, bool visible);
 void SetWindowResizable(VulkanWindowContext* ctx, bool resizable);
 void SetWindowAlwaysOnTop(VulkanWindowContext* ctx, bool alwaysOnTop);
+void SetWindowExcludeFromCapture(VulkanWindowContext* ctx, bool exclude);
 void SetWindowFullscreen(VulkanWindowContext* ctx, bool fullscreen);
 bool IsWindowFullscreen(VulkanWindowContext* ctx);
 void MinimizeWindow(VulkanWindowContext* ctx);

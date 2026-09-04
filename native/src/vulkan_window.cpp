@@ -680,6 +680,14 @@ void SetWindowAlwaysOnTop(VulkanWindowContext* ctx, bool alwaysOnTop) {
     SetWindowPos(ctx->hwnd, alwaysOnTop ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
+void SetWindowExcludeFromCapture(VulkanWindowContext* ctx, bool exclude) {
+    if (!ctx || !ctx->hwnd) return;
+    // WDA_EXCLUDEFROMCAPTURE = 0x00000011 (Windows 10 2004+ / Windows 11)
+    // WDA_NONE = 0x00000000
+    DWORD affinity = exclude ? 0x00000011 : 0x00000000;
+    SetWindowDisplayAffinity(ctx->hwnd, affinity);
+}
+
 void SetWindowFullscreen(VulkanWindowContext* ctx, bool fullscreen) {
     if (!ctx || !ctx->hwnd || ctx->isFullscreen == fullscreen) return;
 

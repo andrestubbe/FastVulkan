@@ -238,6 +238,18 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    /**
+     * Excludes or includes this window from screen capture (DXGI, PrintWindow, BitBlt, OBS).
+     * <p>Uses Win32 SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE).
+     * When true, this window remains visible on monitor but is completely transparent/excluded
+     * from all screen capture tools, preventing recursive feedback loops.
+     */
+    public void setExcludeFromCapture(boolean exclude) {
+        if (nativeHandle != 0) {
+            nSetExcludeFromCapture(nativeHandle, exclude);
+        }
+    }
+
     public void setFullscreen(boolean fullscreen) {
         if (nativeHandle != 0) {
             nSetFullscreen(nativeHandle, fullscreen);
@@ -318,7 +330,7 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nSetResizable(long handle, boolean resizable);
 
     private static native void nSetAlwaysOnTop(long handle, boolean alwaysOnTop);
-
+    private static native void nSetExcludeFromCapture(long handle, boolean exclude);
     private static native void nSetFullscreen(long handle, boolean fullscreen);
 
     private static native boolean nIsFullscreen(long handle);

@@ -483,6 +483,9 @@ public class DemoScreenshotMeshWarp {
                 FastTheme.setCornerStyle(hwnd, 2);
             }
 
+            // Exclude this window from screen capture (prevents recursive hall-of-mirrors feedback)
+            window.setExcludeFromCapture(true);
+
             // 3. Upload screenshot to native Vulkan GPU texture
             long texture = window.createTexture(pixels, imgW, imgH, true);
             if (texture == 0) {

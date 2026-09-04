@@ -121,6 +121,11 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetAlwaysOnTop(
     if (handle) SetWindowAlwaysOnTop((VulkanWindowContext*)handle, alwaysOnTop == JNI_TRUE);
 }
 
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetExcludeFromCapture(
+    JNIEnv* env, jclass clazz, jlong handle, jboolean exclude) {
+    if (handle) SetWindowExcludeFromCapture((VulkanWindowContext*)handle, exclude == JNI_TRUE);
+}
+
 JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nSetFullscreen(
     JNIEnv* env, jclass clazz, jlong handle, jboolean fullscreen) {
     if (handle) SetWindowFullscreen((VulkanWindowContext*)handle, fullscreen == JNI_TRUE);
