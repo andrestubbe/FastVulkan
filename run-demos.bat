@@ -10,7 +10,7 @@ if exist "C:\Program Files\VulkanSDK\1.4.357.0\Bin" set PATH=C:\Program Files\Vu
 echo ========================================================
 echo  FastVulkan Showcase Demos Launcher
 echo ========================================================
-echo  [1] DemoScreenshotMeshWarp  (200x100 Grid 40k Mesh Multi-Effect Warp)
+echo  [1] DemoScreenshotMeshWarp  (240x135 Grid 65k Mesh 14-Algorithm Warp + [V] Dots)
 echo  [2] DemoGraphics2DCompare   (1:1 Pixel Calibration Suite)
 echo ========================================================
 set /p DEMO_CHOICE="Waehle Demo [1-2] (Standard: 1): "

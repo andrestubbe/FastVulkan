@@ -117,8 +117,8 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
-    void drawColoredOval(float x, float y, float w, float h, float r, float g, float b, float a,
-                         boolean antialias, boolean outline, float strokeWidth) {
+    public void drawColoredOval(float x, float y, float w, float h, float r, float g, float b, float a,
+                                 boolean antialias, boolean outline, float strokeWidth) {
         if (nativeHandle != 0) {
             nDrawColoredOval(nativeHandle, x, y, w, h, r, g, b, a, antialias, outline, strokeWidth);
         }
@@ -140,7 +140,7 @@ public class FastVulkanWindow implements AutoCloseable {
     }
 
     public void drawTexturedTriangles(long texHandle, float[] vertexData, int vertexCount) {
-        if (nativeHandle != 0 && texHandle != 0 && vertexData != null && vertexCount > 0) {
+        if (nativeHandle != 0 && vertexData != null && vertexCount > 0) {
             nDrawTexturedTriangles(nativeHandle, texHandle, vertexData, vertexCount);
         }
     }

@@ -76,7 +76,7 @@ struct VulkanWindowContext {
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
     // Dynamic vertex buffers (Per-Frame in Flight for zero-stall CPU/GPU overlap)
-    static constexpr size_t MAX_VERTICES = 262144; // 262k vertices (~43k quads per frame)
+    static constexpr size_t MAX_VERTICES = 1048576; // 1M vertices (~174k quads per frame)
     VkBuffer vertexBuffers[MAX_FRAMES_IN_FLIGHT]{};
     VkDeviceMemory vertexBufferMemories[MAX_FRAMES_IN_FLIGHT]{};
     void* vertexBuffersMapped[MAX_FRAMES_IN_FLIGHT]{};
