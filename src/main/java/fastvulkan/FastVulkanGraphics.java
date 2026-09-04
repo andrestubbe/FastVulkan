@@ -177,14 +177,18 @@ public class FastVulkanGraphics implements AutoCloseable {
         }
 
         if (texHandle != null && texHandle != 0) {
-            float[] rgba = toRGBA(currentColor);
-            window.drawImage(texHandle, x, y, width, height, 0.0f, 0.0f, 1.0f, 1.0f, rgba[0], rgba[1], rgba[2], rgba[3]);
+            window.drawImage(texHandle, x, y, width, height, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
         }
     }
 
     public void drawImage(long texHandle, float x, float y, float width, float height) {
         if (texHandle == 0 || width <= 0 || height <= 0) return;
-        float[] rgba = toRGBA(currentColor);
+        window.drawImage(texHandle, x, y, width, height, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+    }
+
+    public void drawImageTinted(long texHandle, float x, float y, float width, float height, Color tint) {
+        if (texHandle == 0 || width <= 0 || height <= 0) return;
+        float[] rgba = toRGBA(tint != null ? tint : currentColor);
         window.drawImage(texHandle, x, y, width, height, 0.0f, 0.0f, 1.0f, 1.0f, rgba[0], rgba[1], rgba[2], rgba[3]);
     }
 
