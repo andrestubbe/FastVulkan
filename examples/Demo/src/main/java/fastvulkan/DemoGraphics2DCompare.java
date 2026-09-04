@@ -261,9 +261,21 @@ public class DemoGraphics2DCompare {
                         currentEngine.label, lastCalcMicros[0], lastCalcMicros[0] / 1000.0);
             };
 
-            // Run initial measurement for first engine
+            // Render function that redraws current scene without timing
+            Runnable renderActiveScene = () -> {
+                switch (currentEngine) {
+                    case VULKAN_FACES -> {
+                        vkg.setEngineMode(FastVulkanGraphics.EngineMode.VULKAN_FACES);
+                        renderVulkanScene(vkg, testImg);
+                    }
+                    case VULKAN_MARLIN, JAVA2D -> {
+                        vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
+                    }
+                }
+            };
+
+            // Run initial measurement
             triggerCalculation.run();
-            window.present();
 
             try (FastKeyboard keyboard = FastKeyboard.openForWindow(hwnd)) {
                 keyboard.startListening((dev, vKey, makeCode, isPressed, isE0, ts, keyChar) -> {
@@ -274,15 +286,17 @@ public class DemoGraphics2DCompare {
                 });
 
                 while (window.pollEvents()) {
+                    FastDWM.waitForVSync();
+
                     if (dirty[0]) {
                         dirty[0] = false;
                         triggerCalculation.run();
-                        window.present();
                     } else {
-                        // Static presentation without recomputing scene
-                        window.present();
-                        Thread.sleep(10);
+                        // Keep the image on the screen by submitting the draw calls for each frame
+                        renderActiveScene.run();
                     }
+
+                    window.present();
                 }
             }
 
