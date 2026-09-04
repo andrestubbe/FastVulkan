@@ -139,6 +139,12 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    public void drawTexturedTriangles(long texHandle, float[] vertexData, int vertexCount) {
+        if (nativeHandle != 0 && texHandle != 0 && vertexData != null && vertexCount > 0) {
+            nDrawTexturedTriangles(nativeHandle, texHandle, vertexData, vertexCount);
+        }
+    }
+
     void flushBatch() {
         if (nativeHandle != 0) {
             nFlushBatch(nativeHandle);
@@ -342,9 +348,8 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nFlushBatch(long handle);
 
     private static native void nDrawColoredRect(long handle, float x, float y, float w, float h, float r, float g, float b, float a);
-
     private static native void nDrawColoredOval(long handle, float x, float y, float w, float h, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
-
     private static native void nDrawColoredRoundRect(long handle, float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
     private static native void nDrawBezierQuad(long handle, float p0x, float p0y, float p1x, float p1y, float p2x, float p2y, float r, float g, float b, float a);
+    private static native void nDrawTexturedTriangles(long handle, long texHandle, float[] vertexData, int vertexCount);
 }

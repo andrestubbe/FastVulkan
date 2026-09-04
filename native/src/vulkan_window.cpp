@@ -1042,8 +1042,34 @@ void DrawBezierQuad(VulkanWindowContext* ctx, float p0x, float p0y, float p1x, f
     ctx->drawBatches.back().vertexCount += 3;
 }
 
+void DrawTexturedTriangles(VulkanWindowContext* ctx, VulkanTexture* tex, const float* vertexData, int vertexCount) {
+    if (!ctx || !vertexData || vertexCount <= 0) return;
 
+    size_t currentCount = ctx->queuedVertices.size();
+    if (currentCount + vertexCount > ctx->MAX_VERTICES) {
+        vertexCount = (int)(ctx->MAX_VERTICES - currentCount);
+        if (vertexCount <= 0) return;
+    }
 
+    VulkanTexture* useTex = tex ? tex : ctx->whiteTexture;
+    if (ctx->drawBatches.empty() || ctx->drawBatches.back().texture != useTex) {
+        ctx->drawBatches.push_back({ useTex, (uint32_t)currentCount, 0 });
+    }
 
+    ctx->queuedVertices.resize(currentCount + vertexCount);
+    Vertex2D* v = &ctx->queuedVertices[currentCount];
 
+    for (int i = 0; i < vertexCount; i++) {
+        int base = i * 8;
+        v[i].x = vertexData[base + 0];
+        v[i].y = vertexData[base + 1];
+        v[i].u = vertexData[base + 2];
+        v[i].v = vertexData[base + 3];
+        v[i].r = vertexData[base + 4];
+        v[i].g = vertexData[base + 5];
+        v[i].b = vertexData[base + 6];
+        v[i].a = vertexData[base + 7];
+    }
 
+    ctx->drawBatches.back().vertexCount += vertexCount;
+}

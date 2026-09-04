@@ -264,6 +264,15 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawBezierQuad(
     }
 }
 
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawTexturedTriangles(
+    JNIEnv* env, jclass clazz, jlong handle, jlong texHandle, jfloatArray vertexData, jint vertexCount) {
+    if (!handle || !vertexData || vertexCount <= 0) return;
+
+    jfloat* data = (jfloat*)env->GetPrimitiveArrayCritical(vertexData, nullptr);
+    if (data) {
+        DrawTexturedTriangles((VulkanWindowContext*)handle, (VulkanTexture*)texHandle, data, vertexCount);
+        env->ReleasePrimitiveArrayCritical(vertexData, data, JNI_ABORT);
+    }
 }
 
-
+}
