@@ -195,8 +195,21 @@ public class DemoScreenshotMeshWarp {
             }
 
             // Smooth cross-fade between active and next effect
-            warpedPX[i] = bx + offX1 * blendCurr + offX2 * blendNext;
-            warpedPY[i] = by + offY1 * blendCurr + offY2 * blendNext;
+            float dispX = offX1 * blendCurr + offX2 * blendNext;
+            float dispY = offY1 * blendCurr + offY2 * blendNext;
+
+            // Pin borders: compute edge attenuation factor (0.0 at borders, 1.0 in center)
+            // Left/Right: u=0.0 or 1.0 -> factorX = 0; Top/Bottom: v=0.0 or 1.0 -> factorY = 0
+            float u = baseU[i];
+            float v = baseV[i];
+            float edgeDistX = Math.min(u, 1.0f - u) * 2.0f; // 0 at edges, 1 at center
+            float edgeDistY = Math.min(v, 1.0f - v) * 2.0f;
+            float dampX = (float) Math.sin(Math.min(1.0f, edgeDistX * 4.0f) * (Math.PI * 0.5));
+            float dampY = (float) Math.sin(Math.min(1.0f, edgeDistY * 4.0f) * (Math.PI * 0.5));
+            float borderDamp = dampX * dampY;
+
+            warpedPX[i] = bx + dispX * borderDamp;
+            warpedPY[i] = by + dispY * borderDamp;
         }
 
         // Pack into contiguous interleaved array [x, y, u, v, r, g, b, a]
