@@ -221,47 +221,67 @@ public class DemoGraphics2DCompare {
             System.out.println("=================================================================");
 
             // Bind FastKeyboard to the window for zero-latency toggle
+            final boolean[] dirty = new boolean[]{true};
+            final double[] lastCalcMicros = new double[]{0.0};
+
+            Runnable triggerCalculation = () -> {
+                long t0 = System.nanoTime();
+                switch (currentEngine) {
+                    case VULKAN_FACES -> {
+                        vkg.setEngineMode(FastVulkanGraphics.EngineMode.VULKAN_FACES);
+                        renderVulkanScene(vkg, testImg);
+                        vkg.flush();
+                        lastCalcMicros[0] = (System.nanoTime() - t0) / 1000.0;
+                    }
+                    case VULKAN_MARLIN -> {
+                        // Single-pass: Java2D/Marlin rasterization + Vulkan GPU texture upload
+                        Graphics2D offG = j2dImage.createGraphics();
+                        renderJava2DScene(offG, winW, winH, testImg);
+                        offG.dispose();
+                        window.updateTexture(j2dTexture, j2dPixels, winW, winH);
+                        vkg.setEngineMode(FastVulkanGraphics.EngineMode.VULKAN_MARLIN);
+                        vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
+                        vkg.flush();
+                        lastCalcMicros[0] = (System.nanoTime() - t0) / 1000.0;
+                    }
+                    case JAVA2D -> {
+                        // Single-pass: Pure Java2D CPU baseline rasterization
+                        Graphics2D offG = j2dImage.createGraphics();
+                        renderJava2DScene(offG, winW, winH, testImg);
+                        offG.dispose();
+                        lastCalcMicros[0] = (System.nanoTime() - t0) / 1000.0;
+                        vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
+                        vkg.flush();
+                    }
+                }
+                String title = String.format("[%s] Single-Pass Compute: %.2f µs (%.3f ms)  [SPACE] switch",
+                        currentEngine.label, lastCalcMicros[0], lastCalcMicros[0] / 1000.0);
+                window.setTitle(title);
+                System.out.printf("=> %-32s | Single-Pass Time: %8.2f µs (%6.3f ms)%n",
+                        currentEngine.label, lastCalcMicros[0], lastCalcMicros[0] / 1000.0);
+            };
+
+            // Run initial measurement for first engine
+            triggerCalculation.run();
+            window.present();
+
             try (FastKeyboard keyboard = FastKeyboard.openForWindow(hwnd)) {
                 keyboard.startListening((dev, vKey, makeCode, isPressed, isE0, ts, keyChar) -> {
                     if (isPressed && vKey == Keys.SPACE) {
                         currentEngine = CompareEngine.values()[(currentEngine.ordinal() + 1) % CompareEngine.values().length];
-                        System.out.println("Active Engine: " + currentEngine.label);
+                        dirty[0] = true;
                     }
                 });
 
-                long lastFpsTime = System.nanoTime();
-                int frames = 0;
-
                 while (window.pollEvents()) {
-                    FastDWM.waitForVSync();
-
-                    int curW = window.getWidth();
-                    int curH = window.getHeight();
-                    if (curW <= 0) curW = winW;
-                    if (curH <= 0) curH = winH;
-
-                    switch (currentEngine) {
-                        case VULKAN_FACES -> {
-                            vkg.setEngineMode(FastVulkanGraphics.EngineMode.VULKAN_FACES);
-                            renderVulkanScene(vkg, testImg);
-                        }
-                        case VULKAN_MARLIN -> {
-                            vkg.setEngineMode(FastVulkanGraphics.EngineMode.VULKAN_MARLIN);
-                            vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
-                        }
-                        case JAVA2D -> {
-                            vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
-                        }
-                    }
-
-                    window.present();
-
-                    frames++;
-                    long now = System.nanoTime();
-                    if (now - lastFpsTime >= 1_000_000_000L) {
-                        window.setTitle("[" + currentEngine.label + "] FPS: " + frames + "  [SPACE] cycle");
-                        frames = 0;
-                        lastFpsTime = now;
+                    if (dirty[0]) {
+                        dirty[0] = false;
+                        triggerCalculation.run();
+                        window.present();
+                    } else {
+                        // Static presentation without recomputing scene
+                        window.present();
+                        Thread.sleep(10);
                     }
                 }
             }
