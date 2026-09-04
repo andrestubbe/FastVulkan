@@ -109,41 +109,46 @@ public class DemoStressBenchmark {
             System.out.println("   [UP / DOWN] : Increase / Decrease shape count (+/- 2,500)");
             System.out.println("=================================================================");
 
-            while (window.pollEvents()) {
-                // Controls
-                if (window.isKeyJustPressed(0x20)) { // SPACE
-                    useVulkan = !useVulkan;
-                }
-                if (window.isKeyJustPressed(0x26)) { // UP ARROW
-                    shapeCount = Math.min(MAX_SHAPES, shapeCount + 2500);
-                    System.out.println("Shape Count: " + shapeCount);
-                }
-                if (window.isKeyJustPressed(0x28)) { // DOWN ARROW
-                    shapeCount = Math.max(500, shapeCount - 2500);
-                    System.out.println("Shape Count: " + shapeCount);
-                }
+            try (fastkeyboard.FastKeyboard keyboard = fastkeyboard.FastKeyboard.openForWindow(hwnd)) {
+                keyboard.startListening((dev, vKey, makeCode, isPressed, isE0, ts, keyChar) -> {
+                    System.out.println("[KEY EVENT] vKey=" + vKey + " isPressed=" + isPressed + " hwnd=" + hwnd);
+                    if (isPressed) {
+                        if (vKey == fastkeyboard.Keys.SPACE) {
+                            useVulkan = !useVulkan;
+                            System.out.println("Switched engine to: " + (useVulkan ? "FastVulkan" : "Java2D"));
+                        } else if (vKey == fastkeyboard.Keys.UP) {
+                            shapeCount = Math.min(MAX_SHAPES, shapeCount + 2500);
+                            System.out.println("Shape Count: " + shapeCount);
+                        } else if (vKey == fastkeyboard.Keys.DOWN) {
+                            shapeCount = Math.max(500, shapeCount - 2500);
+                            System.out.println("Shape Count: " + shapeCount);
+                        }
+                    }
+                });
 
-                updatePhysics(shapeCount);
+                while (window.pollEvents()) {
+                    updatePhysics(shapeCount);
 
-                if (useVulkan) {
-                    renderVulkan(vkg, shapeCount);
-                } else {
-                    renderJava2D(j2dGraphics, shapeCount);
-                    // Fast GPU Texture Streaming: update pixels directly without reallocating VkImage or stalling
-                    vkg.updateTexture(j2dTexture, j2dPixels, WIN_W, WIN_H);
-                    vkg.drawImage(j2dTexture, 0f, 0f, (float)WIN_W, (float)WIN_H);
-                }
+                    if (useVulkan) {
+                        renderVulkan(vkg, shapeCount);
+                    } else {
+                        renderJava2D(j2dGraphics, shapeCount);
+                        // Fast GPU Texture Streaming: update pixels directly without reallocating VkImage or stalling
+                        vkg.updateTexture(j2dTexture, j2dPixels, WIN_W, WIN_H);
+                        vkg.drawImage(j2dTexture, 0f, 0f, (float)WIN_W, (float)WIN_H);
+                    }
 
-                window.present();
+                    window.present();
 
-                frames++;
-                long now = System.nanoTime();
-                if (now - lastFpsTime >= 1_000_000_000L) {
-                    String mode = useVulkan ? "FASTVULKAN (16x Subpixel GPU)" : "JAVA2D (CPU Marlin)";
-                    window.setTitle(String.format("[%s] Shapes: %,d | FPS: %d | [SPACE] Switch | [UP/DOWN] Count",
-                            mode, shapeCount, frames));
-                    frames = 0;
-                    lastFpsTime = now;
+                    frames++;
+                    long now = System.nanoTime();
+                    if (now - lastFpsTime >= 1_000_000_000L) {
+                        String mode = useVulkan ? "FASTVULKAN (16x Subpixel GPU)" : "JAVA2D (CPU Marlin)";
+                        window.setTitle(String.format("[%s] Shapes: %,d | FPS: %d | [SPACE] Switch | [UP/DOWN] Count",
+                                mode, shapeCount, frames));
+                        frames = 0;
+                        lastFpsTime = now;
+                    }
                 }
             }
 

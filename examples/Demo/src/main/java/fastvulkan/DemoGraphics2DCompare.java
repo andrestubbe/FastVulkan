@@ -1,6 +1,8 @@
 package fastvulkan;
 
 import fastdwm.FastDWM;
+import fastkeyboard.FastKeyboard;
+import fastkeyboard.Keys;
 import fasttheme.FastTheme;
 
 import java.awt.*;
@@ -201,36 +203,41 @@ public class DemoGraphics2DCompare {
             long j2dTexture = window.createTexture(j2dPixels, winW, winH, false);
             FastVulkanGraphics vkg = new FastVulkanGraphics(window);
 
-            long lastFpsTime = System.nanoTime();
-            int frames = 0;
+            // Bind FastKeyboard to the window for zero-latency toggle
+            try (FastKeyboard keyboard = FastKeyboard.openForWindow(hwnd)) {
+                keyboard.startListening((dev, vKey, makeCode, isPressed, isE0, ts, keyChar) -> {
+                    if (isPressed && vKey == Keys.SPACE) {
+                        showJava2D = !showJava2D;
+                    }
+                });
 
-            while (window.pollEvents()) {
-                FastDWM.waitForVSync();
+                long lastFpsTime = System.nanoTime();
+                int frames = 0;
 
-                if (window.isKeyJustPressed(0x20)) {
-                    showJava2D = !showJava2D;
-                }
+                while (window.pollEvents()) {
+                    FastDWM.waitForVSync();
 
-                int curW = window.getWidth();
-                int curH = window.getHeight();
-                if (curW <= 0) curW = winW;
-                if (curH <= 0) curH = winH;
+                    int curW = window.getWidth();
+                    int curH = window.getHeight();
+                    if (curW <= 0) curW = winW;
+                    if (curH <= 0) curH = winH;
 
-                if (showJava2D) {
-                    vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
-                } else {
-                    renderVulkanScene(vkg, testImg);
-                }
+                    if (showJava2D) {
+                        vkg.drawImage(j2dTexture, 0f, 0f, (float)winW, (float)winH);
+                    } else {
+                        renderVulkanScene(vkg, testImg);
+                    }
 
-                window.present();
+                    window.present();
 
-                frames++;
-                long now = System.nanoTime();
-                if (now - lastFpsTime >= 1_000_000_000L) {
-                    String mode = showJava2D ? "JAVA2D Reference" : "FASTVULKAN Native (16x Subpixel SDF)";
-                    window.setTitle("[" + mode + "] FPS: " + frames + "  [SPACE] flip");
-                    frames = 0;
-                    lastFpsTime = now;
+                    frames++;
+                    long now = System.nanoTime();
+                    if (now - lastFpsTime >= 1_000_000_000L) {
+                        String mode = showJava2D ? "JAVA2D Reference" : "FASTVULKAN Native (16x Subpixel SDF)";
+                        window.setTitle("[" + mode + "] FPS: " + frames + "  [SPACE] flip");
+                        frames = 0;
+                        lastFpsTime = now;
+                    }
                 }
             }
 

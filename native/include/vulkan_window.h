@@ -37,12 +37,6 @@ struct VulkanWindowContext {
     int maxWidth = 0, maxHeight = 0;
     int width = 0, height = 0;
 
-    // Input state
-    bool keys[256]{};
-    bool keysJustPressed[256]{};
-    int mouseX = 0, mouseY = 0;
-    bool mouseButtons[5]{};
-
     // Clear color
     float clearR = 0.0f, clearG = 0.0f, clearB = 0.0f, clearA = 1.0f;
     bool firstFramePresented = false;
@@ -153,13 +147,6 @@ void RestoreWindow(VulkanWindowContext* ctx);
 void SetWindowMinSize(VulkanWindowContext* ctx, int minW, int minH);
 void SetWindowMaxSize(VulkanWindowContext* ctx, int maxW, int maxH);
 void SetWindowIcon(VulkanWindowContext* ctx, const uint32_t* pixels, int width, int height);
-
-// Input queries
-bool IsKeyDown(VulkanWindowContext* ctx, int keyCode);
-bool IsKeyJustPressed(VulkanWindowContext* ctx, int keyCode);
-int  GetMouseX(VulkanWindowContext* ctx);
-int  GetMouseY(VulkanWindowContext* ctx);
-bool IsMouseButtonDown(VulkanWindowContext* ctx, int button);
 
 // Texture / drawing
 VulkanTexture* CreateTexture(VulkanWindowContext* ctx, const uint32_t* pixels,

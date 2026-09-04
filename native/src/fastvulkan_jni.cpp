@@ -223,36 +223,6 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nFlushBatch(
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_fastvulkan_FastVulkanWindow_nIsKeyDown(
-    JNIEnv* env, jclass clazz, jlong handle, jint keyCode) {
-    if (!handle) return JNI_FALSE;
-    return IsKeyDown((VulkanWindowContext*)handle, keyCode) ? JNI_TRUE : JNI_FALSE;
-}
-
-JNIEXPORT jboolean JNICALL Java_fastvulkan_FastVulkanWindow_nIsKeyJustPressed(
-    JNIEnv* env, jclass clazz, jlong handle, jint keyCode) {
-    if (!handle) return JNI_FALSE;
-    return IsKeyJustPressed((VulkanWindowContext*)handle, keyCode) ? JNI_TRUE : JNI_FALSE;
-}
-
-JNIEXPORT jint JNICALL Java_fastvulkan_FastVulkanWindow_nGetMouseX(
-    JNIEnv* env, jclass clazz, jlong handle) {
-    if (!handle) return 0;
-    return GetMouseX((VulkanWindowContext*)handle);
-}
-
-JNIEXPORT jint JNICALL Java_fastvulkan_FastVulkanWindow_nGetMouseY(
-    JNIEnv* env, jclass clazz, jlong handle) {
-    if (!handle) return 0;
-    return GetMouseY((VulkanWindowContext*)handle);
-}
-
-JNIEXPORT jboolean JNICALL Java_fastvulkan_FastVulkanWindow_nIsMouseButtonDown(
-    JNIEnv* env, jclass clazz, jlong handle, jint button) {
-    if (!handle) return JNI_FALSE;
-    return IsMouseButtonDown((VulkanWindowContext*)handle, button) ? JNI_TRUE : JNI_FALSE;
-}
-
 JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawColoredRect(
     JNIEnv* env, jclass clazz, jlong handle,
     jfloat x, jfloat y, jfloat w, jfloat h,

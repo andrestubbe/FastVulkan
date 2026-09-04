@@ -203,52 +203,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         }
         break;
 
-    case WM_KEYDOWN:
-        if (ctx && wParam < 256) {
-            if (!ctx->keys[wParam]) {
-                ctx->keysJustPressed[wParam] = true;
-            }
-            ctx->keys[wParam] = true;
-        }
-        return 0;
-
-    case WM_KEYUP:
-        if (ctx && wParam < 256) {
-            ctx->keys[wParam] = false;
-        }
-        return 0;
-
-    case WM_MOUSEMOVE:
-        if (ctx) {
-            ctx->mouseX = LOWORD(lParam);
-            ctx->mouseY = HIWORD(lParam);
-        }
-        return 0;
-
-    case WM_LBUTTONDOWN:
-        if (ctx) ctx->mouseButtons[0] = true;
-        return 0;
-
-    case WM_LBUTTONUP:
-        if (ctx) ctx->mouseButtons[0] = false;
-        return 0;
-
-    case WM_RBUTTONDOWN:
-        if (ctx) ctx->mouseButtons[1] = true;
-        return 0;
-
-    case WM_RBUTTONUP:
-        if (ctx) ctx->mouseButtons[1] = false;
-        return 0;
-
-    case WM_MBUTTONDOWN:
-        if (ctx) ctx->mouseButtons[2] = true;
-        return 0;
-
-    case WM_MBUTTONUP:
-        if (ctx) ctx->mouseButtons[2] = false;
-        return 0;
-
     case WM_CLOSE:
         if (ctx) ctx->shouldClose = true;
         DestroyWindow(hwnd);
@@ -617,9 +571,6 @@ void DestroyVulkanWindow(VulkanWindowContext* ctx) {
 bool PollWindowEvents(VulkanWindowContext* ctx) {
     if (!ctx || !ctx->hwnd) return false;
 
-    // Reset single-frame keypress states
-    memset(ctx->keysJustPressed, 0, sizeof(ctx->keysJustPressed));
-
     MSG msg;
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if (msg.message == WM_QUIT) {
@@ -630,31 +581,6 @@ bool PollWindowEvents(VulkanWindowContext* ctx) {
     }
 
     return !ctx->shouldClose;
-}
-
-bool IsKeyDown(VulkanWindowContext* ctx, int keyCode) {
-    if (!ctx || keyCode < 0 || keyCode >= 256) return false;
-    return ctx->keys[keyCode];
-}
-
-bool IsKeyJustPressed(VulkanWindowContext* ctx, int keyCode) {
-    if (!ctx || keyCode < 0 || keyCode >= 256) return false;
-    return ctx->keysJustPressed[keyCode];
-}
-
-int GetMouseX(VulkanWindowContext* ctx) {
-    if (!ctx) return 0;
-    return ctx->mouseX;
-}
-
-int GetMouseY(VulkanWindowContext* ctx) {
-    if (!ctx) return 0;
-    return ctx->mouseY;
-}
-
-bool IsMouseButtonDown(VulkanWindowContext* ctx, int button) {
-    if (!ctx || button < 0 || button >= 5) return false;
-    return ctx->mouseButtons[button];
 }
 
 void SetClearColor(VulkanWindowContext* ctx, float r, float g, float b, float a) {

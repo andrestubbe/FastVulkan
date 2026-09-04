@@ -27,27 +27,12 @@ public class FastVulkanWindow implements AutoCloseable {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // Events & Input
+    // Events & Message Loop
     // ═══════════════════════════════════════════════════════════
 
     public boolean pollEvents() {
         if (nativeHandle == 0) return false;
         return nPollEvents(nativeHandle);
-    }
-
-    public boolean isKeyDown(int keyCode) {
-        if (nativeHandle == 0) return false;
-        return nIsKeyDown(nativeHandle, keyCode);
-    }
-
-    public boolean isKeyJustPressed(int keyCode) {
-        if (nativeHandle == 0) return false;
-        return nIsKeyJustPressed(nativeHandle, keyCode);
-    }
-
-    public boolean isMouseButtonDown(int button) {
-        if (nativeHandle == 0) return false;
-        return nIsMouseButtonDown(nativeHandle, button);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -192,16 +177,6 @@ public class FastVulkanWindow implements AutoCloseable {
     public int getY() {
         if (nativeHandle == 0) return 0;
         return nGetY(nativeHandle);
-    }
-
-    public int getMouseX() {
-        if (nativeHandle == 0) return 0;
-        return nGetMouseX(nativeHandle);
-    }
-
-    public int getMouseY() {
-        if (nativeHandle == 0) return 0;
-        return nGetMouseY(nativeHandle);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -358,16 +333,6 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nDrawImage(long handle, long texHandle, float x, float y, float w, float h, float u0, float v0, float u1, float v1, float r, float g, float b, float a);
 
     private static native void nFlushBatch(long handle);
-
-    private static native boolean nIsKeyDown(long handle, int keyCode);
-
-    private static native boolean nIsKeyJustPressed(long handle, int keyCode);
-
-    private static native int nGetMouseX(long handle);
-
-    private static native int nGetMouseY(long handle);
-
-    private static native boolean nIsMouseButtonDown(long handle, int button);
 
     private static native void nDrawColoredRect(long handle, float x, float y, float w, float h, float r, float g, float b, float a);
 
