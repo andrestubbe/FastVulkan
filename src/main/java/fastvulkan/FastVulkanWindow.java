@@ -132,6 +132,13 @@ public class FastVulkanWindow implements AutoCloseable {
         }
     }
 
+    void drawBezierQuad(float p0x, float p0y, float p1x, float p1y, float p2x, float p2y,
+                        float r, float g, float b, float a) {
+        if (nativeHandle != 0) {
+            nDrawBezierQuad(nativeHandle, p0x, p0y, p1x, p1y, p2x, p2y, r, g, b, a);
+        }
+    }
+
     void flushBatch() {
         if (nativeHandle != 0) {
             nFlushBatch(nativeHandle);
@@ -339,4 +346,5 @@ public class FastVulkanWindow implements AutoCloseable {
     private static native void nDrawColoredOval(long handle, float x, float y, float w, float h, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
 
     private static native void nDrawColoredRoundRect(long handle, float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, boolean antialias, boolean outline, float strokeWidth);
+    private static native void nDrawBezierQuad(long handle, float p0x, float p0y, float p1x, float p1y, float p2x, float p2y, float r, float g, float b, float a);
 }

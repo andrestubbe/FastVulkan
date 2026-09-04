@@ -163,3 +163,4 @@ void Init2DPipeline(VulkanWindowContext* ctx);
 void DrawColoredRect(VulkanWindowContext* ctx, float x, float y, float w, float h, float r, float g, float b, float a);
 void DrawColoredOval(VulkanWindowContext* ctx, float x, float y, float w, float h, float r, float g, float b, float a, bool antialias, bool outline, float strokeWidth);
 void DrawColoredRoundRect(VulkanWindowContext* ctx, float x, float y, float w, float h, float rx, float ry, float r, float g, float b, float a, bool antialias, bool outline, float strokeWidth);
+void DrawBezierQuad(VulkanWindowContext* ctx, float p0x, float p0y, float p1x, float p1y, float p2x, float p2y, float r, float g, float b, float a);

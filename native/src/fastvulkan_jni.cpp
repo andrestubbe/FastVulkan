@@ -253,6 +253,17 @@ JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawColoredRoundRect(
     }
 }
 
+JNIEXPORT void JNICALL Java_fastvulkan_FastVulkanWindow_nDrawBezierQuad(
+    JNIEnv* env, jclass clazz, jlong handle,
+    jfloat p0x, jfloat p0y,
+    jfloat p1x, jfloat p1y,
+    jfloat p2x, jfloat p2y,
+    jfloat r, jfloat g, jfloat b, jfloat a) {
+    if (handle) {
+        DrawBezierQuad((VulkanWindowContext*)handle, p0x, p0y, p1x, p1y, p2x, p2y, r, g, b, a);
+    }
+}
+
 }
 
 

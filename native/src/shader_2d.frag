@@ -79,6 +79,24 @@ void main() {
         return;
     }
 
+    // Mode -70: GPU Parametric Bézier Curve (Loop-Blinn) for Marlin Vector Pipeline
+    if (u < -65.0) {
+        vec2 p = vec2(u + 70.0, v);
+        float f = p.x * p.x - p.y;
+        vec2 grad = vec2(dFdx(f), dFdy(f));
+        float gLen = length(grad);
+        if (gLen > 0.0) {
+            float dist = f / gLen;
+            float alpha = clamp(0.5 - dist, 0.0, 1.0);
+            if (alpha <= 0.0) discard;
+            outColor = vec4(fragColor.rgb, fragColor.a * alpha);
+        } else {
+            if (f > 0.0) discard;
+            outColor = fragColor;
+        }
+        return;
+    }
+
     // Mode -60: Oval Fill WITHOUT AA (u in [-61, -59])
     if (u < -55.0) {
         vec2 p = vec2(u + 60.0, v);

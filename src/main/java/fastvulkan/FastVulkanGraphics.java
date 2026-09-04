@@ -108,6 +108,8 @@ public class FastVulkanGraphics implements AutoCloseable {
         } else if (shape instanceof RoundRectangle2D rr) {
             fillRoundRect((float) rr.getX(), (float) rr.getY(), (float) rr.getWidth(), (float) rr.getHeight(),
                     (float) rr.getArcWidth(), (float) rr.getArcHeight());
+        } else if (shape != null) {
+            fillPath(shape);
         }
     }
 
@@ -119,6 +121,51 @@ public class FastVulkanGraphics implements AutoCloseable {
         } else if (shape instanceof RoundRectangle2D rr) {
             drawRoundRect((float) rr.getX(), (float) rr.getY(), (float) rr.getWidth(), (float) rr.getHeight(),
                     (float) rr.getArcWidth(), (float) rr.getArcHeight());
+        }
+    }
+
+    public void drawBezierQuad(float p0x, float p0y, float p1x, float p1y, float p2x, float p2y) {
+        float[] rgba = toRGBA(currentColor);
+        window.drawBezierQuad(p0x, p0y, p1x, p1y, p2x, p2y, rgba[0], rgba[1], rgba[2], rgba[3]);
+    }
+
+    private void fillPath(Shape shape) {
+        float[] coords = new float[6];
+        float startX = 0, startY = 0, curX = 0, curY = 0;
+        java.awt.geom.PathIterator pi = shape.getPathIterator(null);
+        while (!pi.isDone()) {
+            int type = pi.currentSegment(coords);
+            switch (type) {
+                case java.awt.geom.PathIterator.SEG_MOVETO -> {
+                    curX = coords[0];
+                    curY = coords[1];
+                    startX = curX;
+                    startY = curY;
+                }
+                case java.awt.geom.PathIterator.SEG_LINETO -> {
+                    curX = coords[0];
+                    curY = coords[1];
+                }
+                case java.awt.geom.PathIterator.SEG_QUADTO -> {
+                    drawBezierQuad(curX, curY, coords[0], coords[1], coords[2], coords[3]);
+                    curX = coords[2];
+                    curY = coords[3];
+                }
+                case java.awt.geom.PathIterator.SEG_CUBICTO -> {
+                    // Approximate cubic Bézier with 2 quadratic Béziers on GPU
+                    float midX = (coords[0] + 2f * coords[2] + coords[4]) * 0.25f;
+                    float midY = (coords[1] + 2f * coords[3] + coords[5]) * 0.25f;
+                    drawBezierQuad(curX, curY, coords[0], coords[1], midX, midY);
+                    drawBezierQuad(midX, midY, coords[2], coords[3], coords[4], coords[5]);
+                    curX = coords[4];
+                    curY = coords[5];
+                }
+                case java.awt.geom.PathIterator.SEG_CLOSE -> {
+                    curX = startX;
+                    curY = startY;
+                }
+            }
+            pi.next();
         }
     }
 

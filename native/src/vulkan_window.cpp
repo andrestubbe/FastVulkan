@@ -1020,6 +1020,28 @@ void DrawColoredRoundRect(VulkanWindowContext* ctx, float x, float y, float w, f
     }
 }
 
+// Draw an analytical GPU Loop-Blinn quadratic Bézier curve triangle
+void DrawBezierQuad(VulkanWindowContext* ctx, float p0x, float p0y, float p1x, float p1y, float p2x, float p2y, float r, float g, float b, float a) {
+    if (!ctx) return;
+    size_t currentCount = ctx->queuedVertices.size();
+    if (currentCount + 3 > ctx->MAX_VERTICES) return;
+
+    if (ctx->drawBatches.empty() || ctx->drawBatches.back().texture != ctx->whiteTexture) {
+        ctx->drawBatches.push_back({ ctx->whiteTexture, (uint32_t)currentCount, 0 });
+    }
+
+    ctx->queuedVertices.resize(currentCount + 3);
+    Vertex2D* v = &ctx->queuedVertices[currentCount];
+
+    // Loop-Blinn barycentric UV encoding for quadratic Bézier curve:
+    // P0 -> (0, 0), P1 -> (0.5, 0), P2 -> (1, 1), offset by -70.0 on U
+    v[0] = { p0x, p0y, -70.0f, 0.0f, r, g, b, a };
+    v[1] = { p1x, p1y, -69.5f, 0.0f, r, g, b, a };
+    v[2] = { p2x, p2y, -69.0f, 1.0f, r, g, b, a };
+
+    ctx->drawBatches.back().vertexCount += 3;
+}
+
 
 
 
