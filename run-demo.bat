@@ -8,11 +8,11 @@ if defined VULKAN_SDK set PATH=%VULKAN_SDK%\Bin;%PATH%
 if exist C:\Program Files\VulkanSDK\1.4.357.0\Bin set PATH=C:\Program Files\VulkanSDK\1.4.357.0\Bin;%PATH%
 
 echo ========================================================
-echo  FastVulkan vs Java2D 1:1 Pixel Calibration Suite
+echo  FastVulkan — Screenshot Mesh Warp Demo (65k Mesh)
 echo ========================================================
 
 cd examples\Demo
-call mvn compile exec:java -Dexec.mainClass=fastvulkan.DemoGraphics2DCompare -q
+call mvn compile exec:java -Dexec.mainClass=fastvulkan.DemoScreenshotMeshWarp -q
 
 cd ..\..
 pause
