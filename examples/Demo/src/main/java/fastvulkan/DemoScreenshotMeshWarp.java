@@ -478,8 +478,8 @@ public class DemoScreenshotMeshWarp {
             long hwnd = window.getHWND();
             if (hwnd != 0) {
                 FastTheme.setTitleBarDarkMode(hwnd, true);
-                FastTheme.setTitleBarColor(hwnd, 15, 15, 15);
-                FastTheme.setTitleBarTextColor(hwnd, 0, 220, 255);
+                FastTheme.setTitleBarColor(hwnd, 20, 20, 20);
+                FastTheme.setTitleBarTextColor(hwnd, 230, 230, 230);
                 FastTheme.setCornerStyle(hwnd, 2);
             }
 
