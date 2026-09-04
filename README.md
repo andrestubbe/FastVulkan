@@ -1,5 +1,8 @@
 > [!WARNING]
-> **🚧 WIP — Active Engine Development & Pipeline Construction in Progress.**
+> **🚧 WORK IN PROGRESS (WIP) — Active Engine Development & Calibration**
+> 
+> * **Active Calibration:** The 2D rendering pipeline, analytical SDF shaders (anti-aliasing, stroke coverage, corner radii), and color spaces are currently undergoing active calibration against Java2D references.
+> * **FastGraphics Migration:** High-level 2D drawing primitives, shape APIs, and canvas abstractions will progressively migrate to **[FastGraphics](https://github.com/andrestubbe/FastGraphics)** as the unified drawing layer across backends, while FastVulkan serves as the dedicated native Vulkan hardware backend and swapchain runtime.
 
 # FastVulkan 0.1.0 [ALPHA-2026-08] — High-Performance Native Vulkan 2D Rendering & Window Engine for Java
 
