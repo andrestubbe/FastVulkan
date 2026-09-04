@@ -1,0 +1,26 @@
+TITLE:
+FastVulkan: Real-Time Desktop Texture Streaming & Hardware Zoom at 120 FPS
+
+DESCRIPTION:
+Showcasing the raw GPU capabilities of FastVulkan, a native lightweight 2D Vulkan rendering engine for Java. In this live demo, a full-resolution desktop screenshot is streamed directly to a native Vulkan GPU texture with hardware mipmap generation and continuously animated using FastTween.
+
+TECHNICAL HIGHLIGHTS:
+- Direct Vulkan Texture Pipeline: Uncompressed memory streaming directly into GPU-resident VkImage memory with automatic hardware mipmap generation (VK_FILTER_LINEAR).
+- Zero-GC Hot Path: Pure event-driven native render loop with zero JVM heap allocations per frame, eliminating micro-stutters and GC pressure entirely.
+- Native VSync Heartbeat: Synchronized via FastDWM to the Windows DWM compositor for tear-free, rock-solid 120+ FPS rendering.
+- Continuous Smooth Tweening: Driven by FastTween with Cubic In/Out easing for fluid continuous zoom without frame drops.
+- Native Win32 Integration: Borderless dark-mode titlebar styling and rounded corners via FastTheme on Windows 11.
+
+GITHUB REPOSITORIES:
+https://github.com/andrestubbe/FastVulkan
+https://github.com/andrestubbe/FastTween
+https://github.com/andrestubbe/FastDWM
+https://github.com/andrestubbe/FastTheme
+https://github.com/andrestubbe/FastCore
+
+OUR PHILOSOPHY:
+No copies. Ever. Critical JNI paths. Native-First performance.
+If you're interested in pushing the JVM to its absolute limits using native bindings, subscribe for more.
+
+TAGS:
+Java, FastJava, Vulkan, GPU, FastVulkan, JNI, Performance, Java2D, FastTween, Computer Graphics, Tech Demo

@@ -28,7 +28,8 @@ public class DemoImageZoom {
         int[] pixels = ((DataBufferInt) screenshot.getRaster().getDataBuffer()).getData();
 
         // Open Vulkan Window
-        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan — Image Zoom & Antialiasing", 1280, 720, 0.08f, 0.08f, 0.08f, 1.0f)) {
+        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan — Image Zoom & Antialiasing", 1173, 610, 0.08f, 0.08f, 0.08f, 1.0f)) {
+            window.centerOnScreen();
             long hwnd = window.getHWND();
             if (hwnd != 0) {
                 FastTheme.setTitleBarDarkMode(hwnd, true);
