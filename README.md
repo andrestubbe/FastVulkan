@@ -219,11 +219,11 @@ Download the required JARs directly to add them to your classpath:
 
 ## Platform Support
 
-| Platform | Status | Notes |
-|:---|:---:|:---|
-| Windows 10/11 (x64) | ✅ Supported | Native Win32 + Vulkan 1.3 |
-| Linux | 🔄 Planned | X11 / Wayland + Vulkan |
-| macOS | 🔄 Planned | MoltenVK |
+| Platform | Architecture | Status | Driver / Subsystem |
+|:---|:---:|:---:|:---|
+| **Windows 10 / 11** | x64 | ✅ Fully Supported | Native Win32 + Vulkan 1.3 ICD Loader |
+| **Linux** | x64 / AArch64 | 🚧 Planned | Native X11 / Wayland + Vulkan 1.3 |
+| **macOS** | Apple Silicon / x64 | 🚧 Planned | Metal Shading Subsystem via MoltenVK |
 
 ---
 
