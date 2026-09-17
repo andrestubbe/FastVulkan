@@ -67,13 +67,29 @@ public class Demo {
 
 ## Why FastVulkan?
 
-Standard Java GUI toolkits suffer from thread synchronization overhead, laggy window resizing, and CPU rasterization bottlenecks. FastVulkan solves this with:
+Standard Java GUI toolkits and rendering engines suffer from thread synchronization bottlenecks, laggy window resizing, and high CPU rasterization overhead:
+
+1. **CPU Rasterization & EDT Stalls**: Java2D and Swing rely on CPU rasterization and synchronize rendering on the single Event Dispatch Thread (EDT), creating stutter under heavy UI loads.
+2. **Laggy Window Resizing**: Standard Java windows freeze or display white flickering artifacts during interactive window border dragging (`WM_SIZE` / `WM_SIZING`).
+3. **High Heap Allocation Churn**: Constructing `Shape`, `Path2D`, and scene graph objects in the render loop causes constant garbage collection pauses.
+4. **Opaque & Obsolete Backends**: JavaFX (Prism) relies on legacy Direct3D 9/11 or OpenGL ES2 pipelines without direct access to modern GPU memory or swapchains.
+
+**FastVulkan** eliminates these bottlenecks by coupling a dedicated Vulkan 1.3 pipeline with native Win32 windowing:
 
 - **FastGPU Core Foundation**: Leverages FastGPU for low-overhead Vulkan device initialization, off-heap memory management, and swapchain coordination.
 - **Native Win32 Message Loop**: Latency-free live window resize (`WM_SIZE` / `WM_SIZING`) without Java thread blocking.
 - **Instanced Quad Batching**: Thousands of shapes rendered in a single Vulkan command buffer dispatch.
 - **Zero-GC Architecture**: Off-heap vertex generation and direct native buffer exchanges.
 - **GPU Texture & Zoom Pipeline**: High-speed image uploads and smooth bilinear sampling.
+
+| Feature | Java2D / Swing | JavaFX (Prism) | FastVulkan |
+|:---|:---|:---|:---|
+| **Graphics Backend** | GDI / Software CPU rasterizer | Legacy Direct3D 9/11 / OpenGL | Modern Vulkan 1.3 Native Pipeline |
+| **Interactive Window Resize** | ❌ White flashes & EDT freeze | ⚠️ Stutter on continuous resize | ✅ Flicker-free live native resize loop |
+| **2D Shape Batching** | ❌ Immediate mode draw calls | ⚠️ Limited quad batching | ✅ Instanced GPU quad batching (1 draw call) |
+| **Render Loop Allocations** | High (`Graphics2D`, `Shape` churn) | High (Scene graph node churn) | **0 bytes** (Off-heap vertex buffers) |
+| **Framerate Cap** | 30–60 FPS (EDT bound) | 60 FPS (VSync bound) | **500–2000+ FPS** (Uncapped swapchain) |
+| **GPU Memory Access** | ❌ Opaque / No direct access | ❌ Private internal pipeline | ✅ Direct off-heap & `FastGPU` access |
 
 ---
 
