@@ -961,11 +961,22 @@ FASTVK_API void fastvk_draw_triangles(int64_t handle,
 }
 
 FASTVK_API int64_t fastvk_create_texture(int64_t handle, int32_t w, int32_t h, const void* pixels) {
-    return 0; // Texture upload implementation
+    VKState* state = (VKState*)handle;
+    if (!state || w <= 0 || h <= 0 || !pixels) return 0;
+    VKTexture* tex = CreateVKTexture(state, pixels, (uint32_t)w, (uint32_t)h);
+    return (int64_t)tex;
 }
 
-FASTVK_API void fastvk_update_texture(int64_t handle, int64_t texHandle, const void* pixels) {}
-FASTVK_API void fastvk_destroy_texture(int64_t handle, int64_t texHandle) {}
+FASTVK_API void fastvk_update_texture(int64_t handle, int64_t texHandle, const void* pixels) {
+    // Sub-region updates can be added if needed
+}
+
+FASTVK_API void fastvk_destroy_texture(int64_t handle, int64_t texHandle) {
+    VKState* state = (VKState*)handle;
+    if (!state || !texHandle) return;
+    VKTexture* tex = (VKTexture*)texHandle;
+    DestroyVKTexture(state, tex);
+}
 
 FASTVK_API void fastvk_end_frame(int64_t handle) {
     VKState* state = (VKState*)handle;
