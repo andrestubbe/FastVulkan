@@ -1,18 +1,41 @@
-﻿@echo off
+@echo off
+setlocal enabledelayedexpansion
 chcp 65001 >nul
-cd /d %~dp0
-
-set MAVEN_OPTS=--enable-native-access=ALL-UNNAMED
-if exist C:\Users\andre\tools\apache-maven-3.9.9\bin set PATH=C:\Users\andre\tools\apache-maven-3.9.9\bin;%PATH%
-if defined VULKAN_SDK set PATH=%VULKAN_SDK%\Bin;%PATH%
-if exist C:\Program Files\VulkanSDK\1.4.357.0\Bin set PATH=C:\Program Files\VulkanSDK\1.4.357.0\Bin;%PATH%
+cd /d "%~dp0"
 
 echo ========================================================
-echo  FastVulkan — Screenshot Mesh Warp Demo (65k Mesh)
+echo  FastVulkan 1.3 — Raster Pattern Demo Launcher
 echo ========================================================
 
-cd examples\Demo
-call mvn compile exec:java -Dexec.mainClass=fastvulkan.DemoScreenshotMeshWarp -q
+:: 1. Build native DLL
+echo [1/3] Compiling native FastVulkan.dll...
+call compile.bat
+if %errorlevel% neq 0 (
+    echo [ERROR] Native build failed.
+    exit /b 1
+)
 
-cd ..\..
+:: 2. Build Java code
+echo.
+echo [2/3] Building Java project...
+call mvn -q -DskipTests test-compile
+if %errorlevel% neq 0 (
+    echo [ERROR] Maven build failed.
+    exit /b 1
+)
+
+:: 3. Run Demo
+echo.
+echo [3/3] Launching FastVulkan Demo...
+call mvn -q dependency:build-classpath -Dmdep.outputFile=target\cp.txt
+set /p DEP_CP=<target\cp.txt
+set FULL_CP=target\classes;target\test-classes;!DEP_CP!
+
+java --enable-preview --enable-native-access=ALL-UNNAMED -cp "!FULL_CP!" fastvulkan.demo.VulkanDemoMain
+if %errorlevel% neq 0 (
+    echo [ERROR] Demo execution failed.
+    exit /b 1
+)
+
+echo Demo finished.
 pause

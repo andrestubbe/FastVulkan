@@ -1,10 +1,15 @@
 # Build output
 target/
 build/
+release/
 *.dll
 *.so
 *.dylib
 *.class
+*.obj
+*.lib
+*.exp
+*.spv
 
 # IDE
 .idea/

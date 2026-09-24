@@ -4,19 +4,18 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.andrestubbe</groupId>
-    <artifactId>FastVulkan</artifactId>
-    <version>0.1.0</version>
+    <groupId>fastvulkan</groupId>
+    <artifactId>fastvulkan</artifactId>
+    <version>0.2.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>FastVulkan</name>
-    <description>Ultra-fast native Vulkan 2D rendering and zero-latency window engine for Java</description>
-    <url>https://github.com/andrestubbe/FastVulkan</url>
+    <description>Vulkan 1.3 GPU Backend for FastGraphics and FastJava</description>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
     </properties>
 
     <repositories>
@@ -27,60 +26,21 @@
     </repositories>
 
     <dependencies>
-        <!-- FastCore - Mandatory JNI Loader -->
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>FastCore</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-
-        <!-- FastTween - High-Performance Easing & Interpolation -->
-        <dependency>
-            <groupId>com.github.andrestubbe</groupId>
-            <artifactId>FastTween</artifactId>
             <version>0.1.1</version>
         </dependency>
-
-        <!-- FastAnimation - Timeline Orchestration & Native VSync Engine -->
         <dependency>
-            <groupId>com.github.andrestubbe</groupId>
-            <artifactId>FastAnimation</artifactId>
-            <version>0.1.2</version>
+            <groupId>fastgraphics</groupId>
+            <artifactId>fastgraphics</artifactId>
+            <version>0.2.0-SNAPSHOT</version>
         </dependency>
-
-        <!-- FastTheme - Native DWM & Titlebar Styling -->
-        <dependency>
-            <groupId>com.github.andrestubbe</groupId>
-            <artifactId>FastTheme</artifactId>
-            <version>0.1.4</version>
-        </dependency>
-
-        <!-- FastWindow - Ultra-Fast Win32 Native Window Engine -->
         <dependency>
             <groupId>com.github.andrestubbe</groupId>
             <artifactId>FastWindow</artifactId>
-            <version>0.1.1</version>
-        </dependency>
-
-        <!-- FastDWM - Native VSync & Windows Timing Substrate -->
-        <dependency>
-            <groupId>com.github.andrestubbe</groupId>
-            <artifactId>FastDWM</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-
-        <!-- FastExecution - Precision Task & Render Loop Scheduler -->
-        <dependency>
-            <groupId>com.github.andrestubbe</groupId>
-            <artifactId>FastExecution</artifactId>
-            <version>0.1.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.10.0</version>
-            <scope>test</scope>
+            <version>0.1.2</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -90,17 +50,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.3.0</version>
                 <configuration>
-                    <archive>
-                        <manifest>
-                            <addClasspath>true</addClasspath>
-                        </manifest>
-                    </archive>
+                    <source>21</source>
+                    <target>21</target>
+                    <compilerArgs>
+                        <arg>--enable-preview</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
         </plugins>

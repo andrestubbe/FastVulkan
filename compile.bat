@@ -1,113 +1,107 @@
 @echo off
-:: FastVulkan Native DLL Compiler Script
-:: Auto-detects Visual Studio, Vulkan SDK and JAVA_HOME
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
 
-echo ========================================
-echo FastVulkan Native Library Builder
-echo ========================================
+echo ========================================================
+echo  Compiling FastVulkan Native DLL (Vulkan 1.3)
+echo ========================================================
 
-set LIB_NAME=fastvulkan
-
-:: Try to find VS using vswhere.exe
-set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-if exist "%VSWHERE%" (
-    for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do (
-        set "VS_PATH=%%i"
+:: 1. Detect JAVA_HOME
+if "%JAVA_HOME%"=="" (
+    for %%d in (
+        "C:\Program Files\Java\jdk-21.0.12.1"
+        "C:\Program Files\Java\jdk-21"
+        "C:\Program Files\Java\jdk-17"
+        "C:\Program Files\Java\jdk-25"
+    ) do (
+        if exist %%d (
+            set "JAVA_HOME=%%~d"
+            goto :found_java
+        )
     )
 )
-
-if not defined VS_PATH (
-    if exist "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" (
-        set "VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Community"
-    ) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
-        set "VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Enterprise"
-    ) else if exist "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Auxiliary\Build\vcvars64.bat" (
-        set "VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Professional"
-    ) else if exist "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" (
-        set "VS_PATH=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
-    )
-)
-
-if not defined VS_PATH (
-    echo ERROR: Visual Studio not found!
+:found_java
+if "%JAVA_HOME%"=="" (
+    echo [ERROR] JAVA_HOME not found.
     exit /b 1
 )
-
-echo Found Visual Studio at: %VS_PATH%
-
-:: Try to detect JAVA_HOME if not set
-if not defined JAVA_HOME (
-    if exist "C:\Program Files\Java\jdk-21.0.12.1" (
-        set "JAVA_HOME=C:\Program Files\Java\jdk-21.0.12.1"
-    ) else if exist "C:\Program Files\Java\jdk-25" (
-        set "JAVA_HOME=C:\Program Files\Java\jdk-25"
-    ) else if exist "C:\Program Files\Eclipse Adoptium\jdk-17-hotspot" (
-        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17-hotspot"
-    ) else if exist "C:\Program Files\Java\jdk-17" (
-        set "JAVA_HOME=C:\Program Files\Java\jdk-17"
-    )
-)
-
-if not defined JAVA_HOME (
-    echo ERROR: JAVA_HOME not set!
-    exit /b 1
-)
-
 echo Using JAVA_HOME: %JAVA_HOME%
 
-:: Check Vulkan SDK
+:: 2. Detect Vulkan SDK
 if not defined VULKAN_SDK (
     if exist "C:\VulkanSDK" (
         for /f "tokens=*" %%d in ('dir /b /ad /o-n "C:\VulkanSDK"') do (
             set "VULKAN_SDK=C:\VulkanSDK\%%d"
-            goto :vulkan_found
+            goto :found_vk
         )
     )
+    if exist "C:\Program Files\VulkanSDK\1.4.357.0" (
+        set "VULKAN_SDK=C:\Program Files\VulkanSDK\1.4.357.0"
+        goto :found_vk
+    )
 )
-:vulkan_found
-if defined VULKAN_SDK (
-    echo Using VULKAN_SDK: %VULKAN_SDK%
-) else (
-    echo WARNING: VULKAN_SDK environment variable not set. Assuming system vulkan-1.lib.
+:found_vk
+if not defined VULKAN_SDK (
+    echo [ERROR] VULKAN_SDK not found.
+    exit /b 1
+)
+echo Using VULKAN_SDK: %VULKAN_SDK%
+
+:: 3. Detect Visual Studio vcvars64.bat
+where cl.exe >nul 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    set "VS_DIR="
+    for %%v in (
+        "C:\Program Files\Microsoft Visual Studio\18\Community"
+        "C:\Program Files\Microsoft Visual Studio\2026\Community"
+        "C:\Program Files\Microsoft Visual Studio\2022\Community"
+        "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"
+        "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
+    ) do (
+        if exist "%%~v\VC\Auxiliary\Build\vcvars64.bat" (
+            set "VS_DIR=%%~v"
+            goto :found_vs
+        )
+    )
+    :found_vs
+    if not defined VS_DIR (
+        echo [ERROR] Visual Studio compiler not found.
+        exit /b 1
+    )
+    echo Found Visual Studio at: !VS_DIR!
+    call "!VS_DIR!\VC\Auxiliary\Build\vcvars64.bat" >nul
 )
 
-:: Setup environment
-call "%VS_PATH%\VC\Auxiliary\Build\vcvars64.bat"
+if not exist "target\classes" mkdir "target\classes"
+if not exist "src\main\resources" mkdir "src\main\resources"
 
-:: Create build directories
-if not exist release mkdir release
-if not exist build mkdir build
+glslc -fshader-stage=vert native\src\shader_2d.vert -o native\src\shader_vert.spv
+glslc -fshader-stage=frag native\src\shader_2d.frag -o native\src\shader_frag.spv
+copy /y native\src\shader_vert.spv src\main\resources\shaders\
+copy /y native\src\shader_frag.spv src\main\resources\shaders\
+copy /y native\src\shader_vert.spv target\classes\shaders\
+copy /y native\src\shader_frag.spv target\classes\shaders\
+copy /y native\src\shader_vert.spv .
+copy /y native\src\shader_frag.spv .
 
-set VK_INC=
-set VK_LIB=
-if defined VULKAN_SDK (
-    set VK_INC=/I "%VULKAN_SDK%\Include"
-    set VK_LIB=/LIBPATH:"%VULKAN_SDK%\Lib"
-)
-
-:: Compile C++ source
 cl.exe /O2 /W3 /std:c++17 /MD /EHsc /LD ^
    /I "%JAVA_HOME%\include" ^
    /I "%JAVA_HOME%\include\win32" ^
-   /I "native\include" ^
-   %VK_INC% ^
-   /Fo:build\ ^
-   /Fe:release\%LIB_NAME%.dll ^
-   native\src\*.cpp ^
-   vulkan-1.lib user32.lib gdi32.lib shcore.lib dwmapi.lib uxtheme.lib ^
-   /link /DLL /MACHINE:X64 %VK_LIB%
+   /I "%VULKAN_SDK%\Include" ^
+   /Fe:target\classes\FastVulkan.dll ^
+   native\VulkanBackend.cpp ^
+   /link /DLL /MACHINE:X64 /LIBPATH:"%VULKAN_SDK%\Lib" vulkan-1.lib user32.lib gdi32.lib
 
-if %ERRORLEVEL% == 0 (
+if %ERRORLEVEL% EQU 0 (
+    copy /y target\classes\FastVulkan.dll . >nul 2>&1
+    copy /y target\classes\FastVulkan.dll src\main\resources\FastVulkan.dll >nul 2>&1
     echo.
-    echo [SUCCESS] DLL built at: release\%LIB_NAME%.dll
-    copy release\%LIB_NAME%.dll . >nul 2>&1
-    if not exist "src\main\resources\native" mkdir "src\main\resources\native"
-    copy release\%LIB_NAME%.dll src\main\resources\native\%LIB_NAME%.dll >nul 2>&1
-    if exist sign-natives.bat call sign-natives.bat
+    echo ========================================================
+    echo [SUCCESS] FastVulkan.dll compiled successfully
+    echo ========================================================
 ) else (
     echo.
-    echo [FAILED] Compilation failed.
+    echo [ERROR] Native compilation failed.
     exit /b 1
 )
-
-echo.
+endlocal
