@@ -481,6 +481,8 @@ static void CreateSwapChain(VKState* state, int w, int h) {
     }
 }
 
+extern "C" {
+
 FASTVK_API int64_t fastvk_create(int64_t hwnd, int32_t w, int32_t h) {
     VKState* state = new VKState();
     state->hwnd = (HWND)hwnd;
@@ -1067,4 +1069,6 @@ FASTVK_API void fastvk_destroy(int64_t handle) {
     vkDestroyInstance(state->instance, nullptr);
 
     delete state;
+}
+
 }

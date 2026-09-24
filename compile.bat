@@ -93,8 +93,12 @@ cl.exe /O2 /W3 /std:c++17 /MD /EHsc /LD ^
    /link /DLL /MACHINE:X64 /LIBPATH:"%VULKAN_SDK%\Lib" vulkan-1.lib user32.lib gdi32.lib
 
 if %ERRORLEVEL% EQU 0 (
+    if not exist "target\classes\native" mkdir "target\classes\native"
+    if not exist "src\main\resources\native" mkdir "src\main\resources\native"
     copy /y target\classes\FastVulkan.dll . >nul 2>&1
     copy /y target\classes\FastVulkan.dll src\main\resources\FastVulkan.dll >nul 2>&1
+    copy /y target\classes\FastVulkan.dll src\main\resources\native\FastVulkan.dll >nul 2>&1
+    copy /y target\classes\FastVulkan.dll target\classes\native\FastVulkan.dll >nul 2>&1
     echo.
     echo ========================================================
     echo [SUCCESS] FastVulkan.dll compiled successfully
