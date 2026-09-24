@@ -397,8 +397,14 @@ static void CreateSwapChain(VKState* state, int w, int h) {
     VkSurfaceCapabilitiesKHR capabilities;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(state->physicalDevice, state->surface, &capabilities);
 
-    state->swapChainExtent.width = (uint32_t)w;
-    state->swapChainExtent.height = (uint32_t)h;
+    if (capabilities.currentExtent.width != UINT32_MAX && capabilities.currentExtent.width > 0) {
+        state->swapChainExtent = capabilities.currentExtent;
+    } else {
+        uint32_t width = (uint32_t)w;
+        uint32_t height = (uint32_t)h;
+        state->swapChainExtent.width = std::clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        state->swapChainExtent.height = std::clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+    }
 
     uint32_t imageCount = capabilities.minImageCount + 1;
     if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
