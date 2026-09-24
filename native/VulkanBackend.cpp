@@ -78,6 +78,7 @@ struct VKState {
     size_t indexBufferSize = 0;
 
     VKTexture* defaultWhiteTexture = nullptr;
+    bool frameActive = false;
 };
 
 static uint32_t FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
@@ -819,15 +820,21 @@ FASTVK_API void fastvk_resize(int64_t handle, int32_t w, int32_t h) {
 FASTVK_API void fastvk_begin_frame(int64_t handle) {
     VKState* state = (VKState*)handle;
     if (!state) return;
+    state->frameActive = false;
 
     vkWaitForFences(state->device, 1, &state->inFlightFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(state->device, 1, &state->inFlightFence);
 
     VkResult acquireRes = vkAcquireNextImageKHR(state->device, state->swapChain, UINT64_MAX, state->imageAvailableSemaphore, VK_NULL_HANDLE, &state->currentImageIndex);
-    if (acquireRes == VK_ERROR_OUT_OF_DATE_KHR) {
+    if (acquireRes == VK_ERROR_OUT_OF_DATE_KHR || acquireRes == VK_SUBOPTIMAL_KHR) {
         fastvk_resize(handle, state->width, state->height);
         return;
     }
+    if (acquireRes != VK_SUCCESS) {
+        return;
+    }
+
+    vkResetFences(state->device, 1, &state->inFlightFence);
+    state->frameActive = true;
 
     vkResetCommandBuffer(state->commandBuffer, 0);
 
@@ -911,7 +918,7 @@ FASTVK_API void fastvk_draw_triangles(int64_t handle,
                                      int64_t textureHandle) {
 
     VKState* state = (VKState*)handle;
-    if (!state || vertexCount == 0 || indexCount == 0 || !vbData || !ibData) return;
+    if (!state || !state->frameActive || vertexCount == 0 || indexCount == 0 || !vbData || !ibData) return;
 
     size_t vbBytes = vertexCount * sizeof(Vertex);
     size_t ibBytes = indexCount * sizeof(uint32_t);
@@ -962,7 +969,7 @@ FASTVK_API void fastvk_destroy_texture(int64_t handle, int64_t texHandle) {}
 
 FASTVK_API void fastvk_end_frame(int64_t handle) {
     VKState* state = (VKState*)handle;
-    if (!state) return;
+    if (!state || !state->frameActive) return;
 
     vkCmdEndRenderPass(state->commandBuffer);
     vkEndCommandBuffer(state->commandBuffer);
@@ -987,7 +994,8 @@ FASTVK_API void fastvk_end_frame(int64_t handle) {
 
 FASTVK_API void fastvk_present(int64_t handle) {
     VKState* state = (VKState*)handle;
-    if (!state) return;
+    if (!state || !state->frameActive) return;
+    state->frameActive = false;
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
