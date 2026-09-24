@@ -1,20 +1,47 @@
 package fastvulkan.demo;
 
 import fastgraphics.g2d.FastGraphics2D;
+import fasttheme.FastTheme;
 import fastvulkan.VulkanBackend;
 import fastwindow.FastNativeWindow;
 import fastwindow.FastWindow;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+
 public final class VulkanDemoMain {
 
+    private static BufferedImage createRoundIcon() {
+        BufferedImage icon = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = icon.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setColor(Color.WHITE);
+        g.fillOval(4, 4, 56, 56);
+        g.dispose();
+        return icon;
+    }
+
     public static void main(String[] args) {
-        int width = 1280;
-        int height = 720;
+        int width = 1024;
+        int height = 600;
 
         try (FastNativeWindow window = FastWindow.create("FastVulkan 1.3 — Raster Test Pattern", width, height);
              VulkanBackend backend = new VulkanBackend()) {
 
+            window.setIconImage(createRoundIcon());
+
             long hwnd = window.getHWND();
+            if (hwnd != 0) {
+                // Schwarze Titelleiste mit weißem Text via FastTheme & abgerundete Ecken
+                FastTheme.setTitleBarDarkMode(hwnd, true);
+                FastTheme.setTitleBarColor(hwnd, 20, 20, 20);
+                FastTheme.setTitleBarTextColor(hwnd, 240, 240, 240);
+                FastTheme.setWindowBackgroundColor(hwnd, 0, 0, 0);
+                FastTheme.setCornerStyle(hwnd, 2);
+            }
+
             backend.initialize(hwnd, width, height);
 
             FastGraphics2D g2d = new FastGraphics2D(backend, width, height);
@@ -33,8 +60,8 @@ public final class VulkanDemoMain {
                 g2d.updateDimensions(curW, curH);
                 g2d.begin();
 
-                // Dunkelgrauer Hintergrund
-                g2d.clear(0.08f, 0.08f, 0.08f, 1.0f);
+                // Reines Schwarz als Hintergrund
+                g2d.clear(0.0f, 0.0f, 0.0f, 1.0f);
 
                 // 1. Raster-Testbild: 8x8 Farb-Kacheln über obere 80% des Fensters gestreckt
                 float gridH = (float) curH * 0.80f;
