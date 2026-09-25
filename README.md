@@ -27,22 +27,39 @@ FastVulkan provides a low-overhead GPU-accelerated 2D pipeline (instanced shapes
 ## Quick Start — Example
 
 ```java
-import fastvulkan.FastVulkanWindow;
-import fastdwm.FastDWM;
-import fasttheme.FastTheme;
+import fastgraphics.g2d.FastGraphics2D;
+import fastvulkan.VulkanBackend;
+import fastwindow.FastNativeWindow;
+import fastwindow.FastWindow;
 
 public class Demo {
     public static void main(String[] args) {
-        try (FastVulkanWindow window = new FastVulkanWindow("FastVulkan Demo", 1024, 600, 0.88f, 0.12f, 0.12f, 1.0f)) {
+        int width = 1280;
+        int height = 720;
+
+        try (FastNativeWindow window = FastWindow.create("FastVulkan Demo", width, height);
+             VulkanBackend backend = new VulkanBackend()) {
+
             long hwnd = window.getHWND();
-            if (hwnd != 0) {
-                FastTheme.setTitleBarDarkMode(hwnd, true);
-                FastTheme.setTitleBarColor(hwnd, 20, 20, 20);
-                FastTheme.setCornerStyle(hwnd, 2);
-            }
-            
-            while (window.isOpen() && window.pollEvents()) {
-                window.present();
+            backend.initialize(hwnd, width, height);
+
+            FastGraphics2D g2d = new FastGraphics2D(backend, width, height);
+
+            // Render first frame before showing window to eliminate white flash
+            g2d.begin();
+            g2d.clear(0.08f, 0.08f, 0.08f, 1.0f);
+            g2d.setColor(1.0f, 0.3f, 0.1f, 1.0f);
+            g2d.fillRect(100, 100, 400, 300);
+            g2d.end();
+
+            window.setVisible(true);
+
+            while (window.pollEvents()) {
+                g2d.begin();
+                g2d.clear(0.08f, 0.08f, 0.08f, 1.0f);
+                g2d.setColor(1.0f, 0.5f, 0.0f, 1.0f);
+                g2d.fillRect(150, 150, 500, 350);
+                g2d.end();
             }
         }
     }
