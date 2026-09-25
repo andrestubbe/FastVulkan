@@ -71,11 +71,13 @@ struct VKState {
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
     void* vertexBufferMapped = nullptr;
     size_t vertexBufferSize = 0;
+    size_t vertexBufferOffset = 0;
 
     VkBuffer indexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
     void* indexBufferMapped = nullptr;
     size_t indexBufferSize = 0;
+    size_t indexBufferOffset = 0;
 
     VKTexture* defaultWhiteTexture = nullptr;
     bool frameActive = false;
@@ -91,6 +93,14 @@ static uint32_t FindMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFil
     }
     return UINT32_MAX;
 }
+
+static const uint32_t g_embeddedVertShader[] =
+#include "src/shader_vert.inc"
+;
+
+static const uint32_t g_embeddedFragShader[] =
+#include "src/shader_frag.inc"
+;
 
 static std::vector<char> ReadShaderFile(const std::string& filename) {
     std::vector<std::string> searchPaths = {
@@ -114,6 +124,17 @@ static std::vector<char> ReadShaderFile(const std::string& filename) {
         }
     }
     return {};
+}
+
+static VkShaderModule CreateShaderModuleFromWords(VkDevice device, const uint32_t* words, size_t wordCount) {
+    if (!words || wordCount == 0) return VK_NULL_HANDLE;
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = wordCount * sizeof(uint32_t);
+    createInfo.pCode = words;
+    VkShaderModule shaderModule = VK_NULL_HANDLE;
+    vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule);
+    return shaderModule;
 }
 
 static VkShaderModule CreateShaderModule(VkDevice device, const std::vector<char>& code) {
@@ -184,7 +205,7 @@ static VKTexture* CreateVKTexture(VKState* state, const void* pixels, uint32_t w
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
-    imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -298,7 +319,7 @@ static VKTexture* CreateVKTexture(VKState* state, const void* pixels, uint32_t w
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = tex->image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+    viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
@@ -445,7 +466,15 @@ static void CreateSwapChain(VKState* state, int w, int h) {
     createInfo.oldSwapchain = oldSwap;
 
     VkSwapchainKHR newSwap = VK_NULL_HANDLE;
-    vkCreateSwapchainKHR(state->device, &createInfo, nullptr, &newSwap);
+    VkResult scRes = vkCreateSwapchainKHR(state->device, &createInfo, nullptr, &newSwap);
+    if (scRes != VK_SUCCESS) {
+        fprintf(stderr, "[FastVulkan] ERROR: vkCreateSwapchainKHR failed with %d\n", (int)scRes);
+        fflush(stderr);
+    } else {
+        printf("[FastVulkan] vkCreateSwapchainKHR succeeded (extent=%ux%u, images=%u)\n", 
+            state->swapChainExtent.width, state->swapChainExtent.height, imageCount);
+        fflush(stdout);
+    }
     state->swapChain = newSwap;
 
     if (oldSwap != VK_NULL_HANDLE) {
@@ -511,7 +540,10 @@ FASTVK_API int64_t fastvk_create(int64_t hwnd, int32_t w, int32_t h) {
     instInfo.enabledExtensionCount = 2;
     instInfo.ppEnabledExtensionNames = extensions;
 
-    if (vkCreateInstance(&instInfo, nullptr, &state->instance) != VK_SUCCESS) {
+    VkResult instRes = vkCreateInstance(&instInfo, nullptr, &state->instance);
+    if (instRes != VK_SUCCESS) {
+        fprintf(stderr, "[FastVulkan] ERROR: vkCreateInstance failed with %d\n", (int)instRes);
+        fflush(stderr);
         delete state;
         return 0;
     }
@@ -521,7 +553,10 @@ FASTVK_API int64_t fastvk_create(int64_t hwnd, int32_t w, int32_t h) {
     sci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
     sci.hwnd = state->hwnd;
     sci.hinstance = GetModuleHandle(nullptr);
-    if (vkCreateWin32SurfaceKHR(state->instance, &sci, nullptr, &state->surface) != VK_SUCCESS) {
+    VkResult surfRes = vkCreateWin32SurfaceKHR(state->instance, &sci, nullptr, &state->surface);
+    if (surfRes != VK_SUCCESS) {
+        fprintf(stderr, "[FastVulkan] ERROR: vkCreateWin32SurfaceKHR failed with %d on HWND %p\n", (int)surfRes, state->hwnd);
+        fflush(stderr);
         vkDestroyInstance(state->instance, nullptr);
         delete state;
         return 0;
@@ -657,11 +692,18 @@ FASTVK_API int64_t fastvk_create(int64_t hwnd, int32_t w, int32_t h) {
     pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
     vkCreatePipelineLayout(state->device, &pipelineLayoutInfo, nullptr, &state->pipelineLayout);
 
-    // Shaders
-    auto vertCode = ReadShaderFile("shader_vert.spv");
-    auto fragCode = ReadShaderFile("shader_frag.spv");
-    VkShaderModule vertModule = CreateShaderModule(state->device, vertCode);
-    VkShaderModule fragModule = CreateShaderModule(state->device, fragCode);
+    // Shaders: Use directly embedded SPIR-V bytecode with fallback to disk
+    VkShaderModule vertModule = CreateShaderModuleFromWords(state->device, g_embeddedVertShader, sizeof(g_embeddedVertShader) / sizeof(uint32_t));
+    if (vertModule == VK_NULL_HANDLE) {
+        auto vertCode = ReadShaderFile("shader_vert.spv");
+        vertModule = CreateShaderModule(state->device, vertCode);
+    }
+
+    VkShaderModule fragModule = CreateShaderModuleFromWords(state->device, g_embeddedFragShader, sizeof(g_embeddedFragShader) / sizeof(uint32_t));
+    if (fragModule == VK_NULL_HANDLE) {
+        auto fragCode = ReadShaderFile("shader_frag.spv");
+        fragModule = CreateShaderModule(state->device, fragCode);
+    }
 
     VkPipelineShaderStageCreateInfo vertStage{};
     vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -834,15 +876,21 @@ FASTVK_API void fastvk_begin_frame(int64_t handle) {
 
     VkResult acquireRes = vkAcquireNextImageKHR(state->device, state->swapChain, UINT64_MAX, state->imageAvailableSemaphore, VK_NULL_HANDLE, &state->currentImageIndex);
     if (acquireRes == VK_ERROR_OUT_OF_DATE_KHR || acquireRes == VK_SUBOPTIMAL_KHR) {
+        printf("[FastVulkan] vkAcquireNextImageKHR returned %d (re-sizing)\n", (int)acquireRes);
+        fflush(stdout);
         fastvk_resize(handle, state->width, state->height);
         return;
     }
     if (acquireRes != VK_SUCCESS) {
+        fprintf(stderr, "[FastVulkan] ERROR: vkAcquireNextImageKHR failed with %d\n", (int)acquireRes);
+        fflush(stderr);
         return;
     }
 
     vkResetFences(state->device, 1, &state->inFlightFence);
     state->frameActive = true;
+    state->vertexBufferOffset = 0;
+    state->indexBufferOffset = 0;
 
     vkResetCommandBuffer(state->commandBuffer, 0);
 
@@ -887,6 +935,21 @@ FASTVK_API void fastvk_clear(int64_t handle, float r, float g, float b, float a)
     state->clearColor[1] = g;
     state->clearColor[2] = b;
     state->clearColor[3] = a;
+
+    if (state->frameActive) {
+        VkClearAttachment clearAttachment{};
+        clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        clearAttachment.colorAttachment = 0;
+        clearAttachment.clearValue.color = { {r, g, b, a} };
+
+        VkClearRect clearRect{};
+        clearRect.rect.offset = { 0, 0 };
+        clearRect.rect.extent = state->swapChainExtent;
+        clearRect.baseArrayLayer = 0;
+        clearRect.layerCount = 1;
+
+        vkCmdClearAttachments(state->commandBuffer, 1, &clearAttachment, 1, &clearRect);
+    }
 }
 
 FASTVK_API void fastvk_set_viewport(int64_t handle, int32_t x, int32_t y, int32_t w, int32_t h) {
@@ -931,32 +994,39 @@ FASTVK_API void fastvk_draw_triangles(int64_t handle,
     size_t vbBytes = vertexCount * sizeof(Vertex);
     size_t ibBytes = indexCount * sizeof(uint32_t);
 
-    if (state->vertexBufferSize < vbBytes) {
+    // 16-byte alignment for vertex buffer offset, 4-byte for index buffer offset
+    size_t alignedVbOffset = (state->vertexBufferOffset + 15) & ~15;
+    size_t alignedIbOffset = (state->indexBufferOffset + 3) & ~3;
+
+    size_t requiredVbSize = alignedVbOffset + vbBytes;
+    size_t requiredIbSize = alignedIbOffset + ibBytes;
+
+    if (state->vertexBufferSize < requiredVbSize) {
         if (state->vertexBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(state->device, state->vertexBuffer, nullptr);
             vkFreeMemory(state->device, state->vertexBufferMemory, nullptr);
         }
-        state->vertexBufferSize = vbBytes + 8192;
+        state->vertexBufferSize = (std::max)(state->vertexBufferSize * 2, requiredVbSize + 65536);
         CreateBuffer(state, state->vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, state->vertexBuffer, state->vertexBufferMemory);
         vkMapMemory(state->device, state->vertexBufferMemory, 0, state->vertexBufferSize, 0, &state->vertexBufferMapped);
     }
 
-    if (state->indexBufferSize < ibBytes) {
+    if (state->indexBufferSize < requiredIbSize) {
         if (state->indexBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(state->device, state->indexBuffer, nullptr);
             vkFreeMemory(state->device, state->indexBufferMemory, nullptr);
         }
-        state->indexBufferSize = ibBytes + 8192;
+        state->indexBufferSize = (std::max)(state->indexBufferSize * 2, requiredIbSize + 65536);
         CreateBuffer(state, state->indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, state->indexBuffer, state->indexBufferMemory);
         vkMapMemory(state->device, state->indexBufferMemory, 0, state->indexBufferSize, 0, &state->indexBufferMapped);
     }
 
-    memcpy(state->vertexBufferMapped, vbData, vbBytes);
-    memcpy(state->indexBufferMapped, ibData, ibBytes);
+    memcpy((char*)state->vertexBufferMapped + alignedVbOffset, vbData, vbBytes);
+    memcpy((char*)state->indexBufferMapped + alignedIbOffset, ibData, ibBytes);
 
-    VkDeviceSize offsets[] = { 0 };
+    VkDeviceSize offsets[] = { (VkDeviceSize)alignedVbOffset };
     vkCmdBindVertexBuffers(state->commandBuffer, 0, 1, &state->vertexBuffer, offsets);
-    vkCmdBindIndexBuffer(state->commandBuffer, state->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(state->commandBuffer, state->indexBuffer, (VkDeviceSize)alignedIbOffset, VK_INDEX_TYPE_UINT32);
 
     if (textureHandle != 0) {
         VKTexture* tex = (VKTexture*)textureHandle;
@@ -966,6 +1036,9 @@ FASTVK_API void fastvk_draw_triangles(int64_t handle,
     }
 
     vkCmdDrawIndexed(state->commandBuffer, indexCount, 1, 0, 0, 0);
+
+    state->vertexBufferOffset = alignedVbOffset + vbBytes;
+    state->indexBufferOffset = alignedIbOffset + ibBytes;
 }
 
 FASTVK_API int64_t fastvk_create_texture(int64_t handle, int32_t w, int32_t h, const void* pixels) {
@@ -1030,7 +1103,12 @@ FASTVK_API void fastvk_present(int64_t handle) {
 
     VkResult presentRes = vkQueuePresentKHR(state->graphicsQueue, &presentInfo);
     if (presentRes == VK_ERROR_OUT_OF_DATE_KHR || presentRes == VK_SUBOPTIMAL_KHR) {
+        printf("[FastVulkan] vkQueuePresentKHR returned %d (re-sizing)\n", (int)presentRes);
+        fflush(stdout);
         fastvk_resize(handle, state->width, state->height);
+    } else if (presentRes != VK_SUCCESS) {
+        fprintf(stderr, "[FastVulkan] ERROR: vkQueuePresentKHR failed with %d\n", (int)presentRes);
+        fflush(stderr);
     }
 }
 

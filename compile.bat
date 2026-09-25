@@ -77,12 +77,12 @@ if not exist "src\main\resources" mkdir "src\main\resources"
 
 glslc -fshader-stage=vert native\src\shader_2d.vert -o native\src\shader_vert.spv
 glslc -fshader-stage=frag native\src\shader_2d.frag -o native\src\shader_frag.spv
+glslc -fshader-stage=vert -mfmt=c native\src\shader_2d.vert -o native\src\shader_vert.inc
+glslc -fshader-stage=frag -mfmt=c native\src\shader_2d.frag -o native\src\shader_frag.inc
 copy /y native\src\shader_vert.spv src\main\resources\shaders\
 copy /y native\src\shader_frag.spv src\main\resources\shaders\
 copy /y native\src\shader_vert.spv target\classes\shaders\
 copy /y native\src\shader_frag.spv target\classes\shaders\
-copy /y native\src\shader_vert.spv .
-copy /y native\src\shader_frag.spv .
 
 cl.exe /O2 /W3 /std:c++17 /MD /EHsc /LD ^
    /I "%JAVA_HOME%\include" ^
