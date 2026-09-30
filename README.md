@@ -4,12 +4,12 @@
 > * **Active Calibration:** The 2D rendering pipeline, analytical SDF shaders (anti-aliasing, stroke coverage, corner radii), and color spaces are currently undergoing active calibration against Java2D references.
 > * **FastGraphics Migration:** High-level 2D drawing primitives, shape APIs, and canvas abstractions will progressively migrate to **[FastGraphics](https://github.com/andrestubbe/FastGraphics)** as the unified drawing layer across backends, while FastVulkan serves as the dedicated native Vulkan hardware backend and swapchain runtime.
 
-# FastVulkan 0.1.0 [ALPHA-2026-08] — High-Performance Native Vulkan 2D Rendering & Window Engine for Java
+# FastVulkan 0.1.0 [ALPHA-2026-09-30] — High-Performance Native Vulkan 2D Rendering & Window Engine for Java
 
 [![Status](https://img.shields.io/badge/status-0.1.0-brightgreen.svg)](https://github.com/andrestubbe/FastVulkan/releases/tag/0.1.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010+%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![JitPack](https://img.shields.io/badge/JitPack-0.1.0-green.svg)](https://jitpack.io/#andrestubbe/FastVulkan)
 
 ---
@@ -74,6 +74,8 @@ public class Demo {
 - [Key Features](#key-features)
 - [Architecture & Progressive Roadmap](#architecture--progressive-roadmap)
 - [Real-World Use Cases](#real-world-use-cases)
+- [API Quick Reference](#api-quick-reference)
+- [Technical Demos & Benchmarks](#technical-demos--benchmarks)
 - [Installation](#installation)
 - [Documentation](#documentation)
 - [Platform Support](#platform-support)
@@ -139,7 +141,30 @@ Standard Java GUI toolkits and rendering engines suffer from thread synchronizat
 
 ---
 
+## API Quick Reference
+
+| Method / Signature | Return Type | Description | Docs |
+|:---|:---|:---|:---|
+| `initialize(long hwnd, int width, int height)` | `void` | Initializes Vulkan 1.3 device, surface, and swapchain for target HWND. | [Wiki](docs/REFERENCE.md) |
+| `beginFrame()` | `void` | Begins command buffer recording and acquires next swapchain image. | [Wiki](docs/REFERENCE.md) |
+| `clear(float r, float g, float b, float a)` | `void` | Clears color attachments to specified RGBA values. | [Wiki](docs/REFERENCE.md) |
+| `drawTriangles(TriangleBatch batch)` | `void` | Dispatches instanced 2D triangle batches to the active command buffer. | [Wiki](docs/REFERENCE.md) |
+| `createTexture(int width, int height, ByteBuffer rgbaPixels)` | `BackendTexture` | Uploads pixel buffer to GPU off-heap device memory. | [Wiki](docs/REFERENCE.md) |
+| `present()` | `void` | Submits render commands and queues swapchain present. | [Wiki](docs/REFERENCE.md) |
+| `resize(int width, int height)` | `void` | Rebuilds swapchain upon interactive window resize events. | [Wiki](docs/REFERENCE.md) |
+
+---
+
+## Technical Demos & Benchmarks
+
+| Case | Java Example | Launcher | Description |
+|:---|:---|:---|:---|
+| **Raster Pattern Demo** | [VulkanDemoMain.java](src/test/java/fastvulkan/demo/VulkanDemoMain.java) | `run-demo.bat` | Real-time Vulkan 1.3 interactive 2D geometry, transforms, and resize loop. |
+
+---
+
 ## Installation
+
 
 ### Option 1: Maven (Recommended)
 
