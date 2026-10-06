@@ -132,7 +132,7 @@ void main() {
         vec2 p = vec2(u + 20.0, v);
         vec2 dPdx = dFdx(p);
         vec2 dPdy = dFdy(p);
-        float alpha = calculateRoundRectCoverage(p, dPdx, dPdy, vec2(1.0, 1.0), 0.35);
+        float alpha = calculateRoundRectCoverage(p, dPdx, dPdy, vec2(1.0, 1.0), 0.25);
         if (alpha <= 0.0) discard;
         outColor = vec4(fragColor.rgb, fragColor.a * alpha);
         return;
@@ -144,9 +144,7 @@ void main() {
         vec2 dPdx = dFdx(p);
         vec2 dPdy = dFdy(p);
         float pxSize = max(length(dPdx), length(dPdy));
-        // Stroke width of 1 physical pixel in normalized coordinates = pxSize
-        // Calibrated corner radius: 0.368 matches Java2D arc center on expanded w+1 quad
-        float alpha = calculateRoundRectStrokeCoverage(p, dPdx, dPdy, vec2(1.0, 1.0), 0.368, pxSize);
+        float alpha = calculateRoundRectStrokeCoverage(p, dPdx, dPdy, vec2(1.0, 1.0), 0.25, pxSize);
         if (alpha <= 0.0) discard;
         outColor = vec4(fragColor.rgb, fragColor.a * alpha);
         return;

@@ -23,13 +23,19 @@ import java.nio.IntBuffer;
  */
 public class VulkanBackend implements GraphicsBackend {
 
+    // ═══════════════════════════════════════════════════════════
+    // Native Method Handles (FFM C ABI Downcalls)
+    // ═══════════════════════════════════════════════════════════
+
     private static final MethodHandle MH_CREATE;
     private static final MethodHandle MH_RESIZE;
     private static final MethodHandle MH_BEGIN_FRAME;
     private static final MethodHandle MH_CLEAR;
     private static final MethodHandle MH_SET_VIEWPORT;
+    private static final MethodHandle MH_SET_SCISSOR;
     private static final MethodHandle MH_SET_PROJECTION;
     private static final MethodHandle MH_SET_BLEND_MODE;
+    private static final MethodHandle MH_SET_TEXTURE_FILTER;
     private static final MethodHandle MH_DRAW_TRIANGLES;
     private static final MethodHandle MH_CREATE_TEXTURE;
     private static final MethodHandle MH_UPDATE_TEXTURE;
@@ -60,11 +66,19 @@ public class VulkanBackend implements GraphicsBackend {
                     FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT),
                     VulkanBackend.class, Arena.global());
 
+            MH_SET_SCISSOR = FastCore.lookupFunction("FastVulkan", "fastvk_set_scissor",
+                    FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT),
+                    VulkanBackend.class, Arena.global());
+
             MH_SET_PROJECTION = FastCore.lookupFunction("FastVulkan", "fastvk_set_projection",
                     FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS),
                     VulkanBackend.class, Arena.global());
 
             MH_SET_BLEND_MODE = FastCore.lookupFunction("FastVulkan", "fastvk_set_blend_mode",
+                    FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT),
+                    VulkanBackend.class, Arena.global());
+
+            MH_SET_TEXTURE_FILTER = FastCore.lookupFunction("FastVulkan", "fastvk_set_texture_filter",
                     FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT),
                     VulkanBackend.class, Arena.global());
 
@@ -101,9 +115,17 @@ public class VulkanBackend implements GraphicsBackend {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // Fields
+    // ═══════════════════════════════════════════════════════════
+
     private long handle;
-    private final Arena frameArena = Arena.ofAuto();
-    private final MemorySegment projSegment = frameArena.allocateArray(ValueLayout.JAVA_FLOAT, 16);
+    private final Arena backendArena = Arena.ofConfined();
+    private final MemorySegment projSegment = backendArena.allocateArray(ValueLayout.JAVA_FLOAT, 16);
+
+    // ═══════════════════════════════════════════════════════════
+    // Lifecycle & Window Management
+    // ═══════════════════════════════════════════════════════════
 
     @Override
     public void initialize(long hwnd, int width, int height) {
@@ -153,10 +175,63 @@ public class VulkanBackend implements GraphicsBackend {
     }
 
     @Override
+    public void endFrame() {
+        if (handle != 0) {
+            try {
+                MH_END_FRAME.invokeExact(handle);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+    }
+
+    @Override
+    public void present() {
+        if (handle != 0) {
+            try {
+                MH_PRESENT.invokeExact(handle);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+        if (handle != 0) {
+            try {
+                MH_DESTROY.invokeExact(handle);
+                handle = 0;
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            } finally {
+                backendArena.close();
+            }
+        } else {
+            backendArena.close();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Pipeline State Setters
+    // ═══════════════════════════════════════════════════════════
+
+    @Override
     public void setViewport(int x, int y, int width, int height) {
         if (handle != 0) {
             try {
                 MH_SET_VIEWPORT.invokeExact(handle, x, y, width, height);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+    }
+
+    @Override
+    public void setScissor(int x, int y, int width, int height) {
+        if (handle != 0) {
+            try {
+                MH_SET_SCISSOR.invokeExact(handle, x, y, width, height);
             } catch (Throwable t) {
                 throw new RuntimeException(t);
             }
@@ -187,20 +262,35 @@ public class VulkanBackend implements GraphicsBackend {
     }
 
     @Override
-    public void drawTriangles(TriangleBatch batch) {
-        if (handle != 0 && batch != null && batch.getVertexCount() > 0 && batch.getIndexCount() > 0) {
+    public void setTextureFilter(int filterMode) {
+        if (handle != 0) {
             try {
-                FloatBuffer vb = batch.getVertexBuffer().duplicate().position(0);
-                IntBuffer ib = batch.getIndexBuffer().duplicate().position(0);
-                MemorySegment vbSeg = MemorySegment.ofBuffer(vb);
-                MemorySegment ibSeg = MemorySegment.ofBuffer(ib);
-                long texHandle = batch.getTexture() != null ? batch.getTexture().getHandle() : 0;
-                MH_DRAW_TRIANGLES.invokeExact(handle, vbSeg, batch.getVertexCount(), ibSeg, batch.getIndexCount(), texHandle);
+                MH_SET_TEXTURE_FILTER.invokeExact(handle, filterMode);
             } catch (Throwable t) {
                 throw new RuntimeException(t);
             }
         }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // Rendering & Triangles Batching
+    // ═══════════════════════════════════════════════════════════
+
+    @Override
+    public void drawTriangles(TriangleBatch batch) {
+        if (handle != 0 && batch != null && batch.getVertexCount() > 0 && batch.getIndexCount() > 0) {
+            try {
+                long texHandle = batch.getTexture() != null ? batch.getTexture().getHandle() : 0;
+                MH_DRAW_TRIANGLES.invokeExact(handle, batch.getVertexSegment(), batch.getVertexCount(), batch.getIndexSegment(), batch.getIndexCount(), texHandle);
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Texture Management
+    // ═══════════════════════════════════════════════════════════
 
     @Override
     public BackendTexture createTexture(int width, int height, ByteBuffer rgbaPixels) {
@@ -234,41 +324,6 @@ public class VulkanBackend implements GraphicsBackend {
                 MH_DESTROY_TEXTURE.invokeExact(handle, texture.getHandle());
             } catch (Throwable t) {
                 throw new RuntimeException(t);
-            }
-        }
-    }
-
-    @Override
-    public void endFrame() {
-        if (handle != 0) {
-            try {
-                MH_END_FRAME.invokeExact(handle);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
-        }
-    }
-
-    @Override
-    public void present() {
-        if (handle != 0) {
-            try {
-                MH_PRESENT.invokeExact(handle);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
-        }
-    }
-
-    @Override
-    public void close() {
-        if (handle != 0) {
-            try {
-                MH_DESTROY.invokeExact(handle);
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            } finally {
-                handle = 0;
             }
         }
     }

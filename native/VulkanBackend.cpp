@@ -24,8 +24,8 @@ struct VKTexture {
     VkImage image = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
     VkImageView view = VK_NULL_HANDLE;
-    VkSampler sampler = VK_NULL_HANDLE;
-    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+    VkDescriptorSet descriptorSetLinear = VK_NULL_HANDLE;
+    VkDescriptorSet descriptorSetPoint = VK_NULL_HANDLE;
     uint32_t width = 0;
     uint32_t height = 0;
 };
@@ -49,18 +49,29 @@ struct VKState {
     std::vector<VkImageView> swapChainImageViews;
     std::vector<VkFramebuffer> swapChainFramebuffers;
 
+    static const uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+    uint32_t currentFrame = 0;
+
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkCommandPool commandPool = VK_NULL_HANDLE;
-    VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+    VkCommandBuffer commandBuffers[MAX_FRAMES_IN_FLIGHT]{};
 
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+    VkPipeline graphicsPipeline = VK_NULL_HANDLE;          // 1 = SRC_OVER alpha blending
+    VkPipeline graphicsPipelineNone = VK_NULL_HANDLE;      // 0 = BlendMode.NONE (Copy / Overwrite)
+    VkPipeline graphicsPipelineAdditive = VK_NULL_HANDLE;  // 2 = BlendMode.ADDITIVE
+    VkPipeline graphicsPipelineMultiply = VK_NULL_HANDLE;  // 3 = BlendMode.MULTIPLY
+    int32_t currentBlendMode = 1;                          // 0 = NONE, 1 = SRC_OVER, 2 = ADDITIVE, 3 = MULTIPLY
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
-    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
-    VkFence inFlightFence = VK_NULL_HANDLE;
+    VkSampler samplerLinear = VK_NULL_HANDLE;
+    VkSampler samplerPoint = VK_NULL_HANDLE;
+    int32_t currentFilterMode = 0; // 0 = Linear/Bilinear, 1 = Point/Nearest Neighbor
+
+    VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT]{};
+    VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT]{};
+    VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT]{};
 
     uint32_t currentImageIndex = 0;
     float clearColor[4] = { 0.08f, 0.08f, 0.08f, 1.0f };
@@ -78,6 +89,15 @@ struct VKState {
     void* indexBufferMapped = nullptr;
     size_t indexBufferSize = 0;
     size_t indexBufferOffset = 0;
+
+    // Deferred deletion queues (reclaimed after in-flight GPU fence waits)
+    struct RetiredBuffer {
+        VkBuffer buffer;
+        VkDeviceMemory memory;
+        void* mapped;
+    };
+    std::vector<RetiredBuffer> retiredBuffers;
+    std::vector<VKTexture*> retiredTextures;
 
     VKTexture* defaultWhiteTexture = nullptr;
     bool frameActive = false;
@@ -171,11 +191,11 @@ static void CreateBuffer(VKState* state, VkDeviceSize size, VkBufferUsageFlags u
 static void DestroyVKTexture(VKState* state, VKTexture* tex) {
     if (!state || !tex) return;
     if (state->device != VK_NULL_HANDLE) {
-        if (tex->descriptorSet != VK_NULL_HANDLE && state->descriptorPool != VK_NULL_HANDLE) {
-            vkFreeDescriptorSets(state->device, state->descriptorPool, 1, &tex->descriptorSet);
+        if (tex->descriptorSetLinear != VK_NULL_HANDLE && state->descriptorPool != VK_NULL_HANDLE) {
+            vkFreeDescriptorSets(state->device, state->descriptorPool, 1, &tex->descriptorSetLinear);
         }
-        if (tex->sampler != VK_NULL_HANDLE) {
-            vkDestroySampler(state->device, tex->sampler, nullptr);
+        if (tex->descriptorSetPoint != VK_NULL_HANDLE && state->descriptorPool != VK_NULL_HANDLE) {
+            vkFreeDescriptorSets(state->device, state->descriptorPool, 1, &tex->descriptorSetPoint);
         }
         if (tex->view != VK_NULL_HANDLE) {
             vkDestroyImageView(state->device, tex->view, nullptr);
@@ -331,40 +351,54 @@ static VKTexture* CreateVKTexture(VKState* state, const void* pixels, uint32_t w
         return nullptr;
     }
 
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = 1.0f;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-
-    if (vkCreateSampler(state->device, &samplerInfo, nullptr, &tex->sampler) != VK_SUCCESS) {
-        DestroyVKTexture(state, tex);
-        return nullptr;
-    }
-
     VkDescriptorSetAllocateInfo setAllocInfo{};
     setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     setAllocInfo.descriptorPool = state->descriptorPool;
     setAllocInfo.descriptorSetCount = 1;
     setAllocInfo.pSetLayouts = &state->descriptorSetLayout;
 
-    if (vkAllocateDescriptorSets(state->device, &setAllocInfo, &tex->descriptorSet) == VK_SUCCESS) {
+    // Linear descriptor set
+    VkResult resLinear = vkAllocateDescriptorSets(state->device, &setAllocInfo, &tex->descriptorSetLinear);
+    if (resLinear != VK_SUCCESS) {
+        fprintf(stderr, "[FastVulkan] ERROR: vkAllocateDescriptorSets (linear) failed with %d\n", (int)resLinear);
+        fflush(stderr);
+        DestroyVKTexture(state, tex);
+        return nullptr;
+    }
+    {
         VkDescriptorImageInfo descImageInfo{};
         descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         descImageInfo.imageView = tex->view;
-        descImageInfo.sampler = tex->sampler;
+        descImageInfo.sampler = state->samplerLinear;
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = tex->descriptorSet;
+        write.dstSet = tex->descriptorSetLinear;
+        write.dstBinding = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo = &descImageInfo;
+
+        vkUpdateDescriptorSets(state->device, 1, &write, 0, nullptr);
+    }
+
+    // Point descriptor set
+    VkResult resPoint = vkAllocateDescriptorSets(state->device, &setAllocInfo, &tex->descriptorSetPoint);
+    if (resPoint != VK_SUCCESS) {
+        fprintf(stderr, "[FastVulkan] ERROR: vkAllocateDescriptorSets (point) failed with %d\n", (int)resPoint);
+        fflush(stderr);
+        DestroyVKTexture(state, tex);
+        return nullptr;
+    }
+    {
+        VkDescriptorImageInfo descImageInfo{};
+        descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        descImageInfo.imageView = tex->view;
+        descImageInfo.sampler = state->samplerPoint;
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = tex->descriptorSetPoint;
         write.dstBinding = 0;
         write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         write.descriptorCount = 1;
@@ -803,23 +837,69 @@ FASTVK_API int64_t fastvk_create(int64_t hwnd, int32_t w, int32_t h) {
     pipelineInfo.renderPass = state->renderPass;
     pipelineInfo.subpass = 0;
 
+    // 1) Default Pipeline: SRC_OVER alpha blending
     vkCreateGraphicsPipelines(state->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &state->graphicsPipeline);
+
+    // 2) Opaque Pipeline: BlendMode.NONE (Overwrite)
+    colorBlendAttachment.blendEnable = VK_FALSE;
+    vkCreateGraphicsPipelines(state->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &state->graphicsPipelineNone);
+
+    // 3) Additive Pipeline: BlendMode.ADDITIVE (SrcAlpha + One)
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    vkCreateGraphicsPipelines(state->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &state->graphicsPipelineAdditive);
+
+    // 4) Multiply Pipeline: BlendMode.MULTIPLY (DstColor + Zero)
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_DST_COLOR;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    vkCreateGraphicsPipelines(state->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &state->graphicsPipelineMultiply);
 
     vkDestroyShaderModule(state->device, vertModule, nullptr);
     vkDestroyShaderModule(state->device, fragModule, nullptr);
 
-    // 8. Descriptor Pool
+    // 8. Descriptor Pool (Scaled to 4096 to prevent pool exhaustion with large text/texture caches)
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSize.descriptorCount = 128;
+    poolSize.descriptorCount = 4096;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = 128;
+    poolInfo.maxSets = 4096;
     poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     vkCreateDescriptorPool(state->device, &poolInfo, nullptr, &state->descriptorPool);
+
+    // 8b. Texture Samplers (Linear and Point)
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1.0f;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    vkCreateSampler(state->device, &samplerInfo, nullptr, &state->samplerLinear);
+
+    samplerInfo.magFilter = VK_FILTER_NEAREST;
+    samplerInfo.minFilter = VK_FILTER_NEAREST;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    vkCreateSampler(state->device, &samplerInfo, nullptr, &state->samplerPoint);
 
     // 9. Command Pool & Buffer
     VkCommandPoolCreateInfo cpInfo{};
@@ -832,23 +912,39 @@ FASTVK_API int64_t fastvk_create(int64_t hwnd, int32_t w, int32_t h) {
     cbInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cbInfo.commandPool = state->commandPool;
     cbInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cbInfo.commandBufferCount = 1;
-    vkAllocateCommandBuffers(state->device, &cbInfo, &state->commandBuffer);
+    cbInfo.commandBufferCount = VKState::MAX_FRAMES_IN_FLIGHT;
+    vkAllocateCommandBuffers(state->device, &cbInfo, state->commandBuffers);
 
-    // 10. Sync Primitives
+    // 10. Sync Primitives for MAX_FRAMES_IN_FLIGHT
     VkSemaphoreCreateInfo semInfo{};
     semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    vkCreateSemaphore(state->device, &semInfo, nullptr, &state->imageAvailableSemaphore);
-    vkCreateSemaphore(state->device, &semInfo, nullptr, &state->renderFinishedSemaphore);
 
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vkCreateFence(state->device, &fenceInfo, nullptr, &state->inFlightFence);
+
+    for (uint32_t i = 0; i < VKState::MAX_FRAMES_IN_FLIGHT; i++) {
+        vkCreateSemaphore(state->device, &semInfo, nullptr, &state->imageAvailableSemaphores[i]);
+        vkCreateSemaphore(state->device, &semInfo, nullptr, &state->renderFinishedSemaphores[i]);
+        vkCreateFence(state->device, &fenceInfo, nullptr, &state->inFlightFences[i]);
+    }
 
     // 11. 1x1 White Texture
     uint32_t whitePixel = 0xFFFFFFFF;
     state->defaultWhiteTexture = CreateVKTexture(state, &whitePixel, 1, 1);
+
+    // 12. Persistent Vertex & Index Ring Buffers (16 MB VB, 8 MB IB)
+    state->vertexBufferSize = 16 * 1024 * 1024;
+    CreateBuffer(state, state->vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 state->vertexBuffer, state->vertexBufferMemory);
+    vkMapMemory(state->device, state->vertexBufferMemory, 0, state->vertexBufferSize, 0, &state->vertexBufferMapped);
+
+    state->indexBufferSize = 8 * 1024 * 1024;
+    CreateBuffer(state, state->indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 state->indexBuffer, state->indexBufferMemory);
+    vkMapMemory(state->device, state->indexBufferMemory, 0, state->indexBufferSize, 0, &state->indexBufferMapped);
 
     return (int64_t)state;
 }
@@ -872,9 +968,30 @@ FASTVK_API void fastvk_begin_frame(int64_t handle) {
     if (!state) return;
     state->frameActive = false;
 
-    vkWaitForFences(state->device, 1, &state->inFlightFence, VK_TRUE, UINT64_MAX);
+    uint32_t frameIdx = state->currentFrame;
+    vkWaitForFences(state->device, 1, &state->inFlightFences[frameIdx], VK_TRUE, UINT64_MAX);
 
-    VkResult acquireRes = vkAcquireNextImageKHR(state->device, state->swapChain, UINT64_MAX, state->imageAvailableSemaphore, VK_NULL_HANDLE, &state->currentImageIndex);
+    // Reclaim deferred buffers and textures after GPU execution of previous frame
+    for (const auto& rb : state->retiredBuffers) {
+        if (rb.buffer != VK_NULL_HANDLE) {
+            if (rb.mapped != nullptr) {
+                vkUnmapMemory(state->device, rb.memory);
+            }
+            vkDestroyBuffer(state->device, rb.buffer, nullptr);
+            vkFreeMemory(state->device, rb.memory, nullptr);
+        }
+    }
+    state->retiredBuffers.clear();
+
+    for (auto* tex : state->retiredTextures) {
+        if (tex) {
+            DestroyVKTexture(state, tex);
+        }
+    }
+    state->retiredTextures.clear();
+
+    VkResult acquireRes = vkAcquireNextImageKHR(state->device, state->swapChain, UINT64_MAX,
+                                                state->imageAvailableSemaphores[frameIdx], VK_NULL_HANDLE, &state->currentImageIndex);
     if (acquireRes == VK_ERROR_OUT_OF_DATE_KHR || acquireRes == VK_SUBOPTIMAL_KHR) {
         printf("[FastVulkan] vkAcquireNextImageKHR returned %d (re-sizing)\n", (int)acquireRes);
         fflush(stdout);
@@ -887,16 +1004,17 @@ FASTVK_API void fastvk_begin_frame(int64_t handle) {
         return;
     }
 
-    vkResetFences(state->device, 1, &state->inFlightFence);
+    vkResetFences(state->device, 1, &state->inFlightFences[frameIdx]);
     state->frameActive = true;
     state->vertexBufferOffset = 0;
     state->indexBufferOffset = 0;
 
-    vkResetCommandBuffer(state->commandBuffer, 0);
+    VkCommandBuffer cmd = state->commandBuffers[frameIdx];
+    vkResetCommandBuffer(cmd, 0);
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(state->commandBuffer, &beginInfo);
+    vkBeginCommandBuffer(cmd, &beginInfo);
 
     VkRenderPassBeginInfo rpInfo{};
     rpInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -910,8 +1028,8 @@ FASTVK_API void fastvk_begin_frame(int64_t handle) {
     rpInfo.clearValueCount = 1;
     rpInfo.pClearValues = &clearColor;
 
-    vkCmdBeginRenderPass(state->commandBuffer, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(state->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->graphicsPipeline);
+    vkCmdBeginRenderPass(cmd, &rpInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->graphicsPipeline);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -920,12 +1038,12 @@ FASTVK_API void fastvk_begin_frame(int64_t handle) {
     viewport.height = (float)state->swapChainExtent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(state->commandBuffer, 0, 1, &viewport);
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
 
     VkRect2D scissor{};
     scissor.offset = { 0, 0 };
     scissor.extent = state->swapChainExtent;
-    vkCmdSetScissor(state->commandBuffer, 0, 1, &scissor);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
 FASTVK_API void fastvk_clear(int64_t handle, float r, float g, float b, float a) {
@@ -948,13 +1066,14 @@ FASTVK_API void fastvk_clear(int64_t handle, float r, float g, float b, float a)
         clearRect.baseArrayLayer = 0;
         clearRect.layerCount = 1;
 
-        vkCmdClearAttachments(state->commandBuffer, 1, &clearAttachment, 1, &clearRect);
+        VkCommandBuffer cmd = state->commandBuffers[state->currentFrame];
+        vkCmdClearAttachments(cmd, 1, &clearAttachment, 1, &clearRect);
     }
 }
 
 FASTVK_API void fastvk_set_viewport(int64_t handle, int32_t x, int32_t y, int32_t w, int32_t h) {
     VKState* state = (VKState*)handle;
-    if (!state) return;
+    if (!state || !state->frameActive) return;
 
     VkViewport viewport{};
     viewport.x = (float)x;
@@ -963,24 +1082,45 @@ FASTVK_API void fastvk_set_viewport(int64_t handle, int32_t x, int32_t y, int32_
     viewport.height = -(float)h;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(state->commandBuffer, 0, 1, &viewport);
+    VkCommandBuffer cmd = state->commandBuffers[state->currentFrame];
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
 
     VkRect2D scissor{};
     scissor.offset = { x, y };
     scissor.extent = { (uint32_t)w, (uint32_t)h };
-    vkCmdSetScissor(state->commandBuffer, 0, 1, &scissor);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+}
+
+FASTVK_API void fastvk_set_scissor(int64_t handle, int32_t x, int32_t y, int32_t w, int32_t h) {
+    VKState* state = (VKState*)handle;
+    if (!state || !state->frameActive) return;
+
+    VkRect2D scissor{};
+    scissor.offset = { x, y };
+    scissor.extent = { (uint32_t)w, (uint32_t)h };
+    VkCommandBuffer cmd = state->commandBuffers[state->currentFrame];
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
 }
 
 FASTVK_API void fastvk_set_projection(int64_t handle, const float* matrix16) {
     VKState* state = (VKState*)handle;
-    if (!state || !matrix16) return;
+    if (!state || !state->frameActive || !matrix16) return;
 
     memcpy(state->pushConstants.projection, matrix16, 16 * sizeof(float));
-    vkCmdPushConstants(state->commandBuffer, state->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &state->pushConstants);
+    VkCommandBuffer cmd = state->commandBuffers[state->currentFrame];
+    vkCmdPushConstants(cmd, state->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &state->pushConstants);
 }
 
 FASTVK_API void fastvk_set_blend_mode(int64_t handle, int32_t mode) {
-    // Mode handling
+    VKState* state = (VKState*)handle;
+    if (!state) return;
+    state->currentBlendMode = mode;
+}
+
+FASTVK_API void fastvk_set_texture_filter(int64_t handle, int32_t filterMode) {
+    VKState* state = (VKState*)handle;
+    if (!state) return;
+    state->currentFilterMode = filterMode;
 }
 
 FASTVK_API void fastvk_draw_triangles(int64_t handle,
@@ -1003,8 +1143,7 @@ FASTVK_API void fastvk_draw_triangles(int64_t handle,
 
     if (state->vertexBufferSize < requiredVbSize) {
         if (state->vertexBuffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(state->device, state->vertexBuffer, nullptr);
-            vkFreeMemory(state->device, state->vertexBufferMemory, nullptr);
+            state->retiredBuffers.push_back({ state->vertexBuffer, state->vertexBufferMemory, state->vertexBufferMapped });
         }
         state->vertexBufferSize = (std::max)(state->vertexBufferSize * 2, requiredVbSize + 65536);
         CreateBuffer(state, state->vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, state->vertexBuffer, state->vertexBufferMemory);
@@ -1013,8 +1152,7 @@ FASTVK_API void fastvk_draw_triangles(int64_t handle,
 
     if (state->indexBufferSize < requiredIbSize) {
         if (state->indexBuffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(state->device, state->indexBuffer, nullptr);
-            vkFreeMemory(state->device, state->indexBufferMemory, nullptr);
+            state->retiredBuffers.push_back({ state->indexBuffer, state->indexBufferMemory, state->indexBufferMapped });
         }
         state->indexBufferSize = (std::max)(state->indexBufferSize * 2, requiredIbSize + 65536);
         CreateBuffer(state, state->indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, state->indexBuffer, state->indexBufferMemory);
@@ -1024,18 +1162,31 @@ FASTVK_API void fastvk_draw_triangles(int64_t handle,
     memcpy((char*)state->vertexBufferMapped + alignedVbOffset, vbData, vbBytes);
     memcpy((char*)state->indexBufferMapped + alignedIbOffset, ibData, ibBytes);
 
+    VkCommandBuffer cmd = state->commandBuffers[state->currentFrame];
     VkDeviceSize offsets[] = { (VkDeviceSize)alignedVbOffset };
-    vkCmdBindVertexBuffers(state->commandBuffer, 0, 1, &state->vertexBuffer, offsets);
-    vkCmdBindIndexBuffer(state->commandBuffer, state->indexBuffer, (VkDeviceSize)alignedIbOffset, VK_INDEX_TYPE_UINT32);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &state->vertexBuffer, offsets);
+    vkCmdBindIndexBuffer(cmd, state->indexBuffer, (VkDeviceSize)alignedIbOffset, VK_INDEX_TYPE_UINT32);
+
+    VkPipeline pipeline = state->graphicsPipeline;
+    switch (state->currentBlendMode) {
+        case 0: pipeline = state->graphicsPipelineNone; break;
+        case 1: pipeline = state->graphicsPipeline; break;
+        case 2: pipeline = state->graphicsPipelineAdditive; break;
+        case 3: pipeline = state->graphicsPipelineMultiply; break;
+        default: pipeline = state->graphicsPipeline; break;
+    }
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
     if (textureHandle != 0) {
         VKTexture* tex = (VKTexture*)textureHandle;
-        vkCmdBindDescriptorSets(state->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipelineLayout, 0, 1, &tex->descriptorSet, 0, nullptr);
+        VkDescriptorSet ds = (state->currentFilterMode == 1) ? tex->descriptorSetPoint : tex->descriptorSetLinear;
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipelineLayout, 0, 1, &ds, 0, nullptr);
     } else if (state->defaultWhiteTexture) {
-        vkCmdBindDescriptorSets(state->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipelineLayout, 0, 1, &state->defaultWhiteTexture->descriptorSet, 0, nullptr);
+        VkDescriptorSet ds = (state->currentFilterMode == 1) ? state->defaultWhiteTexture->descriptorSetPoint : state->defaultWhiteTexture->descriptorSetLinear;
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->pipelineLayout, 0, 1, &ds, 0, nullptr);
     }
 
-    vkCmdDrawIndexed(state->commandBuffer, indexCount, 1, 0, 0, 0);
+    vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
 
     state->vertexBufferOffset = alignedVbOffset + vbBytes;
     state->indexBufferOffset = alignedIbOffset + ibBytes;
@@ -1049,39 +1200,132 @@ FASTVK_API int64_t fastvk_create_texture(int64_t handle, int32_t w, int32_t h, c
 }
 
 FASTVK_API void fastvk_update_texture(int64_t handle, int64_t texHandle, const void* pixels) {
-    // Sub-region updates can be added if needed
+    VKState* state = (VKState*)handle;
+    if (!state || !texHandle || !pixels) return;
+    VKTexture* tex = (VKTexture*)texHandle;
+    if (tex->width == 0 || tex->height == 0 || tex->image == VK_NULL_HANDLE) return;
+
+    VkDeviceSize imageSize = (VkDeviceSize)tex->width * tex->height * 4;
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+    CreateBuffer(state, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingMemory);
+
+    void* data = nullptr;
+    if (vkMapMemory(state->device, stagingMemory, 0, imageSize, 0, &data) == VK_SUCCESS) {
+        memcpy(data, pixels, (size_t)imageSize);
+        vkUnmapMemory(state->device, stagingMemory);
+    }
+
+    VkCommandBufferAllocateInfo cmdAlloc{};
+    cmdAlloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAlloc.commandPool = state->commandPool;
+    cmdAlloc.commandBufferCount = 1;
+
+    VkCommandBuffer copyCmd = VK_NULL_HANDLE;
+    vkAllocateCommandBuffers(state->device, &cmdAlloc, &copyCmd);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(copyCmd, &beginInfo);
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = tex->image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = { 0, 0, 0 };
+    region.imageExtent = { tex->width, tex->height, 1 };
+
+    vkCmdCopyBufferToImage(copyCmd, stagingBuffer, tex->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(copyCmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    vkEndCommandBuffer(copyCmd);
+
+    VkFence fence = VK_NULL_HANDLE;
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    vkCreateFence(state->device, &fenceInfo, nullptr, &fence);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &copyCmd;
+
+    vkQueueSubmit(state->graphicsQueue, 1, &submitInfo, fence);
+    vkWaitForFences(state->device, 1, &fence, VK_TRUE, UINT64_MAX);
+
+    vkDestroyFence(state->device, fence, nullptr);
+    vkFreeCommandBuffers(state->device, state->commandPool, 1, &copyCmd);
+    vkDestroyBuffer(state->device, stagingBuffer, nullptr);
+    vkFreeMemory(state->device, stagingMemory, nullptr);
 }
 
 FASTVK_API void fastvk_destroy_texture(int64_t handle, int64_t texHandle) {
     VKState* state = (VKState*)handle;
     if (!state || !texHandle) return;
     VKTexture* tex = (VKTexture*)texHandle;
-    DestroyVKTexture(state, tex);
+    if (state->frameActive) {
+        state->retiredTextures.push_back(tex);
+    } else {
+        DestroyVKTexture(state, tex);
+    }
 }
 
 FASTVK_API void fastvk_end_frame(int64_t handle) {
     VKState* state = (VKState*)handle;
     if (!state || !state->frameActive) return;
 
-    vkCmdEndRenderPass(state->commandBuffer);
-    vkEndCommandBuffer(state->commandBuffer);
+    uint32_t frameIdx = state->currentFrame;
+    VkCommandBuffer cmd = state->commandBuffers[frameIdx];
+
+    vkCmdEndRenderPass(cmd);
+    vkEndCommandBuffer(cmd);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { state->imageAvailableSemaphore };
+    VkSemaphore waitSemaphores[] = { state->imageAvailableSemaphores[frameIdx] };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
     submitInfo.pWaitDstStageMask = waitStages;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &state->commandBuffer;
+    submitInfo.pCommandBuffers = &cmd;
 
-    VkSemaphore signalSemaphores[] = { state->renderFinishedSemaphore };
+    VkSemaphore signalSemaphores[] = { state->renderFinishedSemaphores[frameIdx] };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    vkQueueSubmit(state->graphicsQueue, 1, &submitInfo, state->inFlightFence);
+    vkQueueSubmit(state->graphicsQueue, 1, &submitInfo, state->inFlightFences[frameIdx]);
 }
 
 FASTVK_API void fastvk_present(int64_t handle) {
@@ -1089,10 +1333,11 @@ FASTVK_API void fastvk_present(int64_t handle) {
     if (!state || !state->frameActive) return;
     state->frameActive = false;
 
+    uint32_t frameIdx = state->currentFrame;
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    VkSemaphore signalSemaphores[] = { state->renderFinishedSemaphore };
+    VkSemaphore signalSemaphores[] = { state->renderFinishedSemaphores[frameIdx] };
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
@@ -1110,6 +1355,8 @@ FASTVK_API void fastvk_present(int64_t handle) {
         fprintf(stderr, "[FastVulkan] ERROR: vkQueuePresentKHR failed with %d\n", (int)presentRes);
         fflush(stderr);
     }
+
+    state->currentFrame = (state->currentFrame + 1) % VKState::MAX_FRAMES_IN_FLIGHT;
 }
 
 FASTVK_API void fastvk_destroy(int64_t handle) {
@@ -1123,21 +1370,71 @@ FASTVK_API void fastvk_destroy(int64_t handle) {
         state->defaultWhiteTexture = nullptr;
     }
 
+    // Reclaim any remaining retired buffers and textures
+    for (const auto& rb : state->retiredBuffers) {
+        if (rb.buffer != VK_NULL_HANDLE) {
+            if (rb.mapped != nullptr) {
+                vkUnmapMemory(state->device, rb.memory);
+            }
+            vkDestroyBuffer(state->device, rb.buffer, nullptr);
+            vkFreeMemory(state->device, rb.memory, nullptr);
+        }
+    }
+    state->retiredBuffers.clear();
+
+    for (auto* tex : state->retiredTextures) {
+        if (tex) {
+            DestroyVKTexture(state, tex);
+        }
+    }
+    state->retiredTextures.clear();
+
     if (state->vertexBuffer != VK_NULL_HANDLE) {
+        if (state->vertexBufferMapped != nullptr) {
+            vkUnmapMemory(state->device, state->vertexBufferMemory);
+            state->vertexBufferMapped = nullptr;
+        }
         vkDestroyBuffer(state->device, state->vertexBuffer, nullptr);
         vkFreeMemory(state->device, state->vertexBufferMemory, nullptr);
     }
     if (state->indexBuffer != VK_NULL_HANDLE) {
+        if (state->indexBufferMapped != nullptr) {
+            vkUnmapMemory(state->device, state->indexBufferMemory);
+            state->indexBufferMapped = nullptr;
+        }
         vkDestroyBuffer(state->device, state->indexBuffer, nullptr);
         vkFreeMemory(state->device, state->indexBufferMemory, nullptr);
     }
 
-    vkDestroySemaphore(state->device, state->imageAvailableSemaphore, nullptr);
-    vkDestroySemaphore(state->device, state->renderFinishedSemaphore, nullptr);
-    vkDestroyFence(state->device, state->inFlightFence, nullptr);
+    for (uint32_t i = 0; i < VKState::MAX_FRAMES_IN_FLIGHT; i++) {
+        if (state->imageAvailableSemaphores[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(state->device, state->imageAvailableSemaphores[i], nullptr);
+        }
+        if (state->renderFinishedSemaphores[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(state->device, state->renderFinishedSemaphores[i], nullptr);
+        }
+        if (state->inFlightFences[i] != VK_NULL_HANDLE) {
+            vkDestroyFence(state->device, state->inFlightFences[i], nullptr);
+        }
+    }
 
     vkDestroyCommandPool(state->device, state->commandPool, nullptr);
+    if (state->samplerLinear != VK_NULL_HANDLE) {
+        vkDestroySampler(state->device, state->samplerLinear, nullptr);
+    }
+    if (state->samplerPoint != VK_NULL_HANDLE) {
+        vkDestroySampler(state->device, state->samplerPoint, nullptr);
+    }
     vkDestroyDescriptorPool(state->device, state->descriptorPool, nullptr);
+    if (state->graphicsPipelineNone != VK_NULL_HANDLE) {
+        vkDestroyPipeline(state->device, state->graphicsPipelineNone, nullptr);
+    }
+    if (state->graphicsPipelineAdditive != VK_NULL_HANDLE) {
+        vkDestroyPipeline(state->device, state->graphicsPipelineAdditive, nullptr);
+    }
+    if (state->graphicsPipelineMultiply != VK_NULL_HANDLE) {
+        vkDestroyPipeline(state->device, state->graphicsPipelineMultiply, nullptr);
+    }
     vkDestroyPipeline(state->device, state->graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(state->device, state->pipelineLayout, nullptr);
     vkDestroyDescriptorSetLayout(state->device, state->descriptorSetLayout, nullptr);

@@ -75,10 +75,12 @@ if %ERRORLEVEL% NEQ 0 (
 if not exist "target\classes" mkdir "target\classes"
 if not exist "src\main\resources" mkdir "src\main\resources"
 
-glslc -fshader-stage=vert native\src\shader_2d.vert -o native\src\shader_vert.spv
-glslc -fshader-stage=frag native\src\shader_2d.frag -o native\src\shader_frag.spv
-glslc -fshader-stage=vert -mfmt=c native\src\shader_2d.vert -o native\src\shader_vert.inc
-glslc -fshader-stage=frag -mfmt=c native\src\shader_2d.frag -o native\src\shader_frag.inc
+"%VULKAN_SDK%\Bin\glslc.exe" -fshader-stage=vert native\src\shader_2d.vert -o native\src\shader_vert.spv
+"%VULKAN_SDK%\Bin\glslc.exe" -fshader-stage=frag native\src\shader_2d.frag -o native\src\shader_frag.spv
+"%VULKAN_SDK%\Bin\glslc.exe" -fshader-stage=vert -mfmt=c native\src\shader_2d.vert -o native\src\shader_vert.inc
+"%VULKAN_SDK%\Bin\glslc.exe" -fshader-stage=frag -mfmt=c native\src\shader_2d.frag -o native\src\shader_frag.inc
+if not exist "src\main\resources\shaders" mkdir "src\main\resources\shaders"
+if not exist "target\classes\shaders" mkdir "target\classes\shaders"
 copy /y native\src\shader_vert.spv src\main\resources\shaders\
 copy /y native\src\shader_frag.spv src\main\resources\shaders\
 copy /y native\src\shader_vert.spv target\classes\shaders\

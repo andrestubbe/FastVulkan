@@ -18,6 +18,7 @@ FASTVK_API void    fastvk_clear(int64_t handle, float r, float g, float b, float
 FASTVK_API void    fastvk_set_viewport(int64_t handle, int32_t x, int32_t y, int32_t w, int32_t h);
 FASTVK_API void    fastvk_set_projection(int64_t handle, const float* matrix16);
 FASTVK_API void    fastvk_set_blend_mode(int64_t handle, int32_t mode);
+FASTVK_API void    fastvk_set_texture_filter(int64_t handle, int32_t filterMode);
 
 FASTVK_API void    fastvk_draw_triangles(int64_t handle,
                                          const float* vbData, int32_t vertexCount,
