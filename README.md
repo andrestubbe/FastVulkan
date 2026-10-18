@@ -14,7 +14,7 @@
 
 ---
 
-**🌋 Ultra-fast native Vulkan 2D batch rendering and Win32 zero-latency window engine for Java, designed to power FastUI.** Built for maximum framerates, zero JVM Garbage Collection overhead, and seamless live window resizing.
+**🌋 Ultra-fast native Vulkan 2D batch rendering and Win32 zero-latency window engine for Java, designed to power FastGUI.** Built for maximum framerates, zero JVM Garbage Collection overhead, and seamless live window resizing.
 
 FastVulkan provides a low-overhead GPU-accelerated 2D pipeline (instanced shapes, quad batching, texture rendering, and smooth zoom/transforms) with native C++ window management.
 
@@ -118,7 +118,7 @@ Standard Java GUI toolkits and rendering engines suffer from thread synchronizat
 - 🪟 **Native Win32 Windowing**: Native `CreateWindowExW` loop with crisp DPI awareness and direct frame presents.
 - ⚡ **Instanced Batching**: Batch thousands of textured quads, rectangles, and rounded shapes in 1 draw call.
 - 🔍 **Smooth Zoom & Viewport Transform**: High-performance pan/zoom matrix math executed entirely on GPU.
-- 📦 **FastJava Ecosystem Ready**: Interoperates seamlessly with **FastWindow**, **FastGPU**, **FastImage**, **FastUI**, and **FastCore**.
+- 📦 **FastJava Ecosystem Ready**: Interoperates seamlessly with **FastWindow**, **FastGPU**, **FastImage**, **FastGUI**, and **FastCore**.
 
 ---
 
@@ -128,13 +128,13 @@ Standard Java GUI toolkits and rendering engines suffer from thread synchronizat
 2. 🔄 **Native Window & SwapChain**: Win32 window creation and flicker-free resize handling.
 3. 🔄 **Texture & Image Pipeline**: Direct memory bitmap uploads, scaling, and viewport zooming.
 4. 🔄 **2D Shape Batching**: Rectangles, rounded corners, circles, anti-aliased lines.
-5. 🔄 **FastGraphics / FastUI Integration**: Exporting clean abstraction layers for downstream FastJava modules.
+5. 🔄 **FastGraphics / FastGUI Integration**: Exporting clean abstraction layers for downstream FastJava modules.
 
 ---
 
 ## Real-World Use Cases
 
-- 🖥️ **High-FPS UI Frameworks ([FastUI](https://github.com/andrestubbe/FastUI))**: Power complex desktop dashboards, rich vector controls, and live animations with zero GC pauses.
+- 🖥️ **High-FPS UI Frameworks ([FastGUI](https://github.com/andrestubbe/FastGUI))**: Power complex desktop dashboards, rich vector controls, and live animations with zero GC pauses.
 - 🖼️ **Real-Time Image & Video Viewports**: Seamlessly render, pan, and smoothly zoom 4K/8K bitmaps streamed from **[FastImage](https://github.com/andrestubbe/FastImage)** and **[FastScreen](https://github.com/andrestubbe/FastScreen)**.
 - 🎮 **2D Game Engines & Particle Canvas**: Render tens of thousands of batch-instanced sprites, lines, and HUD shapes at 1000+ FPS.
 - 📊 **Scientific & Financial Charting**: Real-time high-frequency candlestick, waveform, and scatter data visualization with instant window resizing.
